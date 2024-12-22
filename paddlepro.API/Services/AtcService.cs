@@ -4,8 +4,11 @@ namespace paddlepro.API.Services;
 
 public class AtcService : IPaddleService
 {
-    public AtcService()
+    ILogger<AtcService> _logger;
+
+    public AtcService(ILogger<AtcService> logger)
     {
+        _logger = logger;
     }
 
     public Club[] GetAvailabilities(DateTime date)

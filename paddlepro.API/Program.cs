@@ -1,4 +1,6 @@
 using paddlepro.API.Services;
+using paddlepro.API.Configurations;
+
 var builder = WebApplication.CreateBuilder(args);
 
 
@@ -9,7 +11,13 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddSingleton<IWeatherService, WeatherService>();
+builder.Services.Configure<WeatherServiceConfiguration>(builder.Configuration.GetSection("WeatherService"));
+builder.Services.Configure<TelegramConfiguration>(builder.Configuration.GetSection("Telegram"));
+builder.Services.Configure<PaddleServiceConfiguration>(builder.Configuration.GetSection("PaddleService"));
+
+builder.Services.AddScoped<IWeatherService, WeatherService>();
+builder.Services.AddScoped<IPaddleService, AtcService>();
+builder.Services.AddScoped<ITelegramService, TelegramService>();
 
 var app = builder.Build();
 
