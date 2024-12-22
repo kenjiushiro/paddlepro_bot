@@ -20,7 +20,7 @@ public class WebhookController : ControllerBase
         _weatherService = weatherService;
     }
 
-    [HttpGet("weather")]
+    [HttpGet("availability")]
     public WeatherForecast Get([FromQuery] DateTime date)
     {
         return this._weatherService.GetWeatherForecast(date);
