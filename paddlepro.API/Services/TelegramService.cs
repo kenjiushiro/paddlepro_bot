@@ -103,7 +103,7 @@ public class TelegramService : ITelegramService
         for (var i = 0; i < DAYS; i++)
         {
             var date = startDate.AddDays(i);
-            inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(date.ToString("dddd dd-MM-yyyy"), date.ToString("dd-MM-yyyy")));
+            inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(date.ToString("dddd dd-MM-yyyy", new System.Globalization.CultureInfo("es-ES")), date.ToString("dd-MM-yyyy")));
         }
 
         var query = await _botClient.SendMessage(chatId, "Elegi dia", messageThreadId: threadId, replyMarkup: inlineKeyboard);
