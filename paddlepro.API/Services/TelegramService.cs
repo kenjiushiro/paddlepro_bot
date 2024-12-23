@@ -27,6 +27,8 @@ public class TelegramService : ITelegramService
     {
         if (update.Type == Telegram.Bot.Types.Enums.UpdateType.Message)
         {
+            var chatId = update?.Message?.Chat.Id;
+            var threadId = update?.Message?.MessageThreadId;
             var command = update.Message?.Text ?? "";
             _logger.LogInformation("Command: {Command}", command);
 
@@ -37,7 +39,7 @@ public class TelegramService : ITelegramService
             }
             else if (command.Contains("buscar"))
             {
-                await Search(update);
+                await Search(chatId, threadId);
             }
             else if (command.Contains("reservar"))
             {
@@ -59,10 +61,8 @@ public class TelegramService : ITelegramService
         return true;
     }
 
-    public async Task Search(Update update)
+    public async Task Search(long? chatId, int? threadId)
     {
-        var chatId = update?.Message?.Chat.Id;
-        var threadId = update?.Message?.MessageThreadId;
         var response = await _botClient.SendMessage(chatId, "Buscando", messageThreadId: threadId);
     }
 
@@ -126,7 +126,7 @@ public class TelegramService : ITelegramService
         }
         else
         {
-            await Search(update);
+            await Search(chatId, threadId);
         }
     }
 }
