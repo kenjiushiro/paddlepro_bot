@@ -30,7 +30,7 @@ public class TelegramService : ITelegramService
             var command = update.Message?.Text ?? "";
             _logger.LogInformation("Command: {Command}", command);
 
-            // TODO move commands to config file
+            // TODO move commands text to config file
             if (command.Contains("readycheck"))
             {
                 await SendAvailableDates(update);
@@ -62,7 +62,8 @@ public class TelegramService : ITelegramService
     public async Task Search(Update update)
     {
         var chatId = update?.Message?.Chat.Id;
-        var response = await _botClient.SendMessage(chatId, "Buscando");
+        var threadId = update?.Message?.MessageThreadId;
+        var response = await _botClient.SendMessage(chatId, "Buscando", messageThreadId: threadId);
     }
 
     public async Task Book(Update update)
@@ -78,19 +79,16 @@ public class TelegramService : ITelegramService
     {
         var matchDate = update?.CallbackQuery?.Data;
 
-        _logger.LogInformation("CallbackQuery.Message: {Message}", update?.CallbackQuery?.Message);
-        _logger.LogInformation("Update.Id: {Id}", update?.Id);
+        var chatId = update?.CallbackQuery?.Message?.Chat.Id;
 
-        _logger.LogInformation("CallbackQuery ID: {Id}", update?.CallbackQuery?.Id);
-
-        var chatId = update?.Message?.Chat?.Id;
         if (chatId == null)
         {
+            _logger.LogWarning("Chat ID null for update {Id} on ReadyCheckPoll step", update.Id);
             return;
         }
-        var threadId = update.Message.MessageThreadId;
+        var threadId = update?.CallbackQuery?.Message?.MessageThreadId;
         var poll = await _botClient.SendPoll(chatId, $"Estas para jugar el {matchDate}?", options, isAnonymous: false, messageThreadId: threadId);
-        pollChatDict.Add(poll.Poll.Id, update.Message);
+        pollChatDict.Add(poll.Poll.Id, update?.CallbackQuery?.Message);
     }
 
     public async Task SendAvailableDates(Update update)
@@ -105,11 +103,10 @@ public class TelegramService : ITelegramService
         for (var i = 0; i < DAYS; i++)
         {
             var date = startDate.AddDays(i);
-            inlineKeyboard.AddButton(InlineKeyboardButton.WithCallbackData(date.ToString("dddd dd-MM-yyyy"), date.ToString("dd-MM-yyyy")));
+            inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(date.ToString("dddd dd-MM-yyyy"), date.ToString("dd-MM-yyyy")));
         }
 
         var query = await _botClient.SendMessage(chatId, "Elegi dia", messageThreadId: threadId, replyMarkup: inlineKeyboard);
-        _logger.LogInformation("Keyboard response Id: {Id}", query.Id);
     }
 
     public async Task HandlePollAnswer(Update update)
@@ -117,6 +114,7 @@ public class TelegramService : ITelegramService
         var count = update?.Poll?.Options.Single(o => o.Text == "Si").VoterCount;
         if (!pollChatDict.TryGetValue(update.Poll.Id, out var message))
         {
+            _logger.LogWarning("Poll ID {Id} not found", update.Poll.Id);
             return;
         }
         var chatId = message.Chat.Id;
@@ -130,7 +128,5 @@ public class TelegramService : ITelegramService
         {
             await Search(update);
         }
-        _logger.LogInformation("Poll Id :{Id}", update.Poll.Id);
-        _logger.LogInformation("Si count :{Count}", count);
     }
 }
