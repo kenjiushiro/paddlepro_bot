@@ -16,7 +16,7 @@ public class TelegramService : ITelegramService
   IContextService _contextService;
   IWeatherService _weatherService;
 
-  private static Dictionary<string, Message> pollMessageDict = new Dictionary<string, Message>();
+  private static Dictionary<string, long?> pollChatIdDict = new Dictionary<string, long?>();
   List<InputPollOption> options = new List<InputPollOption> { new InputPollOption("Si"), new InputPollOption("No") };
 
   public TelegramService(
@@ -46,17 +46,8 @@ public class TelegramService : ITelegramService
       var threadId = update?.Message?.MessageThreadId;
       var command = update?.Message?.Text ?? "";
       _logger.LogInformation("Command: {Command}", command);
-
-      // TODO move commands text to config file
-      if (command.Contains(_telegramConfig.Commands.ReadyCheck))
-      {
-        _contextService.SetChatContext(chatId, threadId, "", command);
-        await SendAvailableDates(chatId, threadId);
-      }
-      else if (command.Contains(_telegramConfig.Commands.Search))
-      {
-        await Search(chatId, threadId);
-      }
+      _contextService.SetChatContext(chatId, threadId, "", command);
+      await SendAvailableDates(chatId);
     }
     else if (update.Type == Telegram.Bot.Types.Enums.UpdateType.Poll)
     {
@@ -67,42 +58,61 @@ public class TelegramService : ITelegramService
     }
     else
     {
-      _logger.LogInformation("Type {type}", update.Type);
-      await ReadyCheckPoll(update);
+      // Date selected
+      var chatId = update?.CallbackQuery?.Message?.Chat.Id;
+      OnDateSelected(update);
+      var context = _contextService.GetChatContext(chatId);
+      if (context.LastCommand.Contains(_telegramConfig.Commands.ReadyCheck))
+      {
+        await StartReadyCheckPoll(chatId);
+      }
+      else if (context.LastCommand.Contains(_telegramConfig.Commands.Search))
+      {
+        await Search(chatId);
+      }
     }
     return true;
   }
 
-  public async Task Search(long? chatId, int? threadId)
+  public async Task Search(long? chatId)
   {
-    var response = await _botClient.SendMessage(chatId, "Buscando", messageThreadId: threadId);
+    var context = _contextService.GetChatContext(chatId);
+    var response = await _botClient.SendMessage(chatId, $"Buscando dia {context.SelectedDate}", messageThreadId: context.MessageThreadId);
   }
 
-  public async Task<(long?, int?, string)> OnDateSelected(Update update)
+  public void OnDateSelected(Update update)
   {
-    var matchDate = update?.CallbackQuery?.Data;
-
     var chatId = update?.CallbackQuery?.Message?.Chat.Id;
+    var threadId = update?.CallbackQuery?.Message?.MessageThreadId;
+
+    var matchDate = update?.CallbackQuery?.Data;
 
     if (chatId == null)
     {
       _logger.LogWarning("Chat ID null for update {Id} on ReadyCheckPoll step", update.Id);
-      return (0, 0, "");
     }
-    var threadId = update?.CallbackQuery?.Message?.MessageThreadId;
-    return (chatId, threadId, matchDate);
+
+    if (matchDate == null)
+    {
+      _logger.LogWarning("Match Date returned null from Update Id {Id}", update.Id);
+    }
+
+    var context = _contextService.GetChatContext(chatId);
+    context.SelectedDate = matchDate;
   }
 
-  public async Task ReadyCheckPoll(Update update)
+  public async Task StartReadyCheckPoll(long? chatId)
   {
-    (long? chatId, int? threadId, string matchDate) = await OnDateSelected(update);
-    var poll = await _botClient.SendPoll(chatId, $"Estas para jugar el {matchDate}?", options, isAnonymous: false, messageThreadId: threadId);
-    pollMessageDict.Add(poll.Poll.Id, update?.CallbackQuery?.Message);
+    var context = _contextService.GetChatContext(chatId);
+
+    var poll = await _botClient.SendPoll(context.ChatId, $"Estas para jugar el {context.SelectedDate}?", options, isAnonymous: false, messageThreadId: context.MessageThreadId);
+    pollChatIdDict.Add(poll.Poll.Id, chatId);
   }
 
-  public async Task SendAvailableDates(long? chatId, int? threadId)
+  public async Task SendAvailableDates(long? chatId)
   {
     var dateRange = DateTime.Today.AddDays(_paddleConfig.DaysInAdvance);
+    var context = _contextService.GetChatContext(chatId);
 
     var inlineKeyboard = new InlineKeyboardMarkup();
 
@@ -113,27 +123,26 @@ public class TelegramService : ITelegramService
       inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(date.ToString("dddd dd-MM-yyyy", new System.Globalization.CultureInfo("es-ES")), date.ToString("dd-MM-yyyy")));
     }
 
-    var query = await _botClient.SendMessage(chatId, "Elegi dia", messageThreadId: threadId, replyMarkup: inlineKeyboard);
+    var query = await _botClient.SendMessage(chatId, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard);
   }
 
   public async Task HandlePollAnswer(Update update)
   {
     var count = update?.Poll?.Options.Single(o => o.Text == "Si").VoterCount;
-    if (!pollMessageDict.TryGetValue(update.Poll.Id, out var message))
+    if (!pollChatIdDict.TryGetValue(update.Poll.Id, out var chatId))
     {
       _logger.LogWarning("Poll ID {Id} not found", update.Poll.Id);
       return;
     }
-    var chatId = message.Chat.Id;
-    var threadId = message.MessageThreadId;
+    var context = _contextService.GetChatContext(chatId);
 
     if (count < _paddleConfig.PlayerCount)
     {
-      await _botClient.SendMessage(chatId, $"Faltan {_paddleConfig.PlayerCount - count} votos", messageThreadId: threadId, disableNotification: true);
+      await _botClient.SendMessage(chatId, $"Faltan {_paddleConfig.PlayerCount - count} votos", messageThreadId: context.MessageThreadId, disableNotification: true);
     }
     else
     {
-      await Search(chatId, threadId);
+      await Search(chatId);
     }
   }
 }
