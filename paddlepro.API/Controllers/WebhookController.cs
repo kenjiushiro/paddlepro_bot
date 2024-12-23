@@ -1,4 +1,4 @@
-using Telegram.Bot.Types;
+using Telegram.Bot;
 using Microsoft.AspNetCore.Mvc;
 using paddlepro.API.Models;
 using paddlepro.API.Services;
@@ -11,22 +11,24 @@ public class WebhookController : ControllerBase
 {
     private readonly ILogger<WebhookController> _logger;
     private readonly IWeatherService _weatherService;
+    private readonly ITelegramService _telegramService;
 
     public WebhookController(
         ILogger<WebhookController> logger,
-        IWeatherService weatherService
+        IWeatherService weatherService,
+        ITelegramService telegramService
         )
     {
         _logger = logger;
         _weatherService = weatherService;
+        _telegramService = telegramService;
     }
 
     [HttpPost]
-    public Update Post([FromBody] Update update)
+    public bool Post([FromBody] Telegram.Bot.Types.Update update)
     {
-        _logger.LogInformation("Id: {UpdateId}", update.Id);
-        _logger.LogInformation("Text: {Text}", update.Message?.Text);
-        return update;
+        _telegramService.Respond(update);
+        return true;
     }
 
     [HttpGet("availability")]

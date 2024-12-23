@@ -1,3 +1,4 @@
+using Telegram.Bot;
 using paddlepro.API.Services;
 using System.Text.Json;
 using paddlepro.API.Configurations;
@@ -25,6 +26,17 @@ builder.Services.Configure<PaddleServiceConfiguration>(builder.Configuration.Get
 builder.Services.AddScoped<IWeatherService, WeatherService>();
 builder.Services.AddScoped<IPaddleService, AtcService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
+
+builder.Services.AddSingleton<ITelegramBotClient>(sp =>
+{
+    var botToken = builder.Configuration["BotConfiguration:BotToken"]; // Ensure this key exists in your appsettings.json
+    Console.WriteLine("==========================================================================================");
+    Console.WriteLine(botToken);
+    Console.WriteLine("==========================================================================================");
+    return new TelegramBotClient("TODO");
+});
+
+/*builder.Services.AddScoped<ITelegramBotClient, TelegramBotClient>();*/
 
 var app = builder.Build();
 
