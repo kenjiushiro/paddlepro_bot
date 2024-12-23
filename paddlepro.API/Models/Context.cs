@@ -8,5 +8,6 @@ public class Context
     public string LastCommand { get; set; } = "";
     public int LatestPollId { get; set; }
     public int LatestDayPicker { get; set; }
+    public int CountMessageId { get; set; }
 }
 

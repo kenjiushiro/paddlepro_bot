@@ -187,7 +187,16 @@ public class TelegramService : ITelegramService
 
         if (count < _paddleConfig.PlayerCount)
         {
-            await _botClient.SendMessage(chatId, $"Faltan {_paddleConfig.PlayerCount - count} votos", messageThreadId: context.MessageThreadId, disableNotification: true);
+            var messageText = $"Faltan {_paddleConfig.PlayerCount - count} votos";
+            if (context.CountMessageId > 0)
+            {
+                await _botClient.EditMessageText(chatId, context.CountMessageId, messageText);
+            }
+            else
+            {
+                var countMessage = await _botClient.SendMessage(chatId, messageText, messageThreadId: context.MessageThreadId, disableNotification: true);
+                context.CountMessageId = countMessage.MessageId;
+            }
         }
         else
         {
