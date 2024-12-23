@@ -1,15 +1,9 @@
-namespace paddlepro.API.Services;
+using paddlepro.API.Models;
 
-public class Context
-{
-  public long? ChatId { get; set; }
-  public int? MessageThreadId { get; set; }
-  public string SelectedDate { get; set; } = "";
-  public string LastCommand { get; set; } = "";
-}
+namespace paddlepro.API.Services;
 
 public interface IContextService
 {
-  void SetChatContext(long? chatId, int? messageThreadId, string selectedDate, string lastCommand);
-  Context GetChatContext(long? chatId);
+    void SetChatContext(long? chatId, int? messageThreadId, string selectedDate, string lastCommand);
+    Context GetChatContext(long? chatId);
 }

@@ -10,9 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
-  options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-  options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
-  options.JsonSerializerOptions.WriteIndented = true;
+    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+    options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
+    options.JsonSerializerOptions.WriteIndented = true;
 });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -28,11 +28,27 @@ builder.Services.AddScoped<IPaddleService, AtcService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
 builder.Services.AddSingleton<IContextService, ContextService>();
 
+builder.Services.AddHttpClient<IWeatherService, WeatherService>(client =>
+{
+    var baseUrl = builder.Configuration["WeatherService:BaseUrl"];
+    var apiKey = builder.Configuration["WeatherService:ApiKey"];
+    var days = builder.Configuration["PaddleService:DaysInAdvance"];
+    var baseUri = new Uri(baseUrl);
+
+    // Add query parameters
+    var queryParams = new Dictionary<string, string>
+    {
+        { "q", "Buenos%20Aires" },
+        { "key", apiKey }
+    };
+    client.BaseAddress = new Uri($"https://api.weatherapi.com/v1/forecast.json?q=Buenos%20Aires&key={apiKey}&days={days}");
+});
+
 builder.Services.AddSingleton<ITelegramBotClient>(sp =>
 {
-  var botToken = builder.Configuration["BotConfiguration:BotToken"];
-  // TODO this might have a cleanr way to instantiate, read docu
-  return new TelegramBotClient(botToken);
+    var botToken = builder.Configuration["BotConfiguration:BotToken"];
+    // TODO this might have a cleanr way to instantiate, read docu
+    return new TelegramBotClient(botToken);
 });
 
 var app = builder.Build();
