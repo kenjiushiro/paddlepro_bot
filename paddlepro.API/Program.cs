@@ -10,9 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
-    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-    options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
-    options.JsonSerializerOptions.WriteIndented = true;
+  options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+  options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
+  options.JsonSerializerOptions.WriteIndented = true;
 });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -29,24 +29,14 @@ builder.Services.AddScoped<ITelegramService, TelegramService>();
 
 builder.Services.AddSingleton<ITelegramBotClient>(sp =>
 {
-    var botToken = builder.Configuration["BotConfiguration:BotToken"]; // Ensure this key exists in your appsettings.json
-    Console.WriteLine("==========================================================================================");
-    Console.WriteLine(botToken);
-    Console.WriteLine("==========================================================================================");
-    return new TelegramBotClient("TODO");
+  var botToken = builder.Configuration["BotConfiguration:BotToken"];
+  // TODO this might have a cleanr way to instantiate, read docu
+  return new TelegramBotClient(botToken);
 });
-
-/*builder.Services.AddScoped<ITelegramBotClient, TelegramBotClient>();*/
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
+// TODO re enable this?
 /*app.UseHttpsRedirection();*/
 
 app.UseAuthorization();
