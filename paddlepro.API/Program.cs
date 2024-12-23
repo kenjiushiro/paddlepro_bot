@@ -26,6 +26,7 @@ builder.Services.Configure<PaddleServiceConfiguration>(builder.Configuration.Get
 builder.Services.AddScoped<IWeatherService, WeatherService>();
 builder.Services.AddScoped<IPaddleService, AtcService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
+builder.Services.AddSingleton<IContextService, ContextService>();
 
 builder.Services.AddSingleton<ITelegramBotClient>(sp =>
 {

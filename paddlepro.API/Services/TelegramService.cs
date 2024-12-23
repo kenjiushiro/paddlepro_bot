@@ -12,12 +12,18 @@ public class TelegramService : ITelegramService
   ILogger<TelegramService> _logger;
   PaddleServiceConfiguration _paddleConfig;
   TelegramConfiguration _telegramConfig;
+  IPaddleService _paddleService;
+  IContextService _contextService;
+  IWeatherService _weatherService;
 
-  private static Dictionary<string, Message> pollChatDict = new Dictionary<string, Message>();
+  private static Dictionary<string, Message> pollMessageDict = new Dictionary<string, Message>();
   List<InputPollOption> options = new List<InputPollOption> { new InputPollOption("Si"), new InputPollOption("No") };
 
   public TelegramService(
       ITelegramBotClient botClient,
+      IPaddleService paddleService,
+      IWeatherService weatherService,
+      IContextService contextService,
       ILogger<TelegramService> logger,
       IOptions<PaddleServiceConfiguration> paddleConfig,
       IOptions<TelegramConfiguration> telegramConfig
@@ -25,6 +31,9 @@ public class TelegramService : ITelegramService
   {
     _botClient = botClient;
     _logger = logger;
+    _contextService = contextService;
+    _paddleService = paddleService;
+    _weatherService = weatherService;
     _paddleConfig = paddleConfig.Value;
     _telegramConfig = telegramConfig.Value;
   }
@@ -41,6 +50,7 @@ public class TelegramService : ITelegramService
       // TODO move commands text to config file
       if (command.Contains(_telegramConfig.Commands.ReadyCheck))
       {
+        _contextService.SetChatContext(chatId, threadId, "", command);
         await SendAvailableDates(chatId, threadId);
       }
       else if (command.Contains(_telegramConfig.Commands.Search))
@@ -68,16 +78,7 @@ public class TelegramService : ITelegramService
     var response = await _botClient.SendMessage(chatId, "Buscando", messageThreadId: threadId);
   }
 
-  public async Task Book(Update update)
-  {
-    var chatId = update?.Message?.Chat.Id;
-    var threadId = update?.Message?.MessageThreadId;
-    var response = await _botClient.SendMessage(chatId, "Reservando");
-
-    await _botClient.SendMessage(chatId, "Link de reserva", messageThreadId: threadId);
-  }
-
-  public async Task ReadyCheckPoll(Update update)
+  public async Task<(long?, int?, string)> OnDateSelected(Update update)
   {
     var matchDate = update?.CallbackQuery?.Data;
 
@@ -86,11 +87,17 @@ public class TelegramService : ITelegramService
     if (chatId == null)
     {
       _logger.LogWarning("Chat ID null for update {Id} on ReadyCheckPoll step", update.Id);
-      return;
+      return (0, 0, "");
     }
     var threadId = update?.CallbackQuery?.Message?.MessageThreadId;
+    return (chatId, threadId, matchDate);
+  }
+
+  public async Task ReadyCheckPoll(Update update)
+  {
+    (long? chatId, int? threadId, string matchDate) = await OnDateSelected(update);
     var poll = await _botClient.SendPoll(chatId, $"Estas para jugar el {matchDate}?", options, isAnonymous: false, messageThreadId: threadId);
-    pollChatDict.Add(poll.Poll.Id, update?.CallbackQuery?.Message);
+    pollMessageDict.Add(poll.Poll.Id, update?.CallbackQuery?.Message);
   }
 
   public async Task SendAvailableDates(long? chatId, int? threadId)
@@ -112,7 +119,7 @@ public class TelegramService : ITelegramService
   public async Task HandlePollAnswer(Update update)
   {
     var count = update?.Poll?.Options.Single(o => o.Text == "Si").VoterCount;
-    if (!pollChatDict.TryGetValue(update.Poll.Id, out var message))
+    if (!pollMessageDict.TryGetValue(update.Poll.Id, out var message))
     {
       _logger.LogWarning("Poll ID {Id} not found", update.Poll.Id);
       return;
