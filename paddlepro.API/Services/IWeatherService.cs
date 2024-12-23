@@ -4,5 +4,5 @@ namespace paddlepro.API.Services;
 
 public interface IWeatherService
 {
-    WeatherForecast GetWeatherForecast(DateTime date);
+  WeatherForecast GetWeatherForecast(string date);
 }

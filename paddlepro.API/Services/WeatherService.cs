@@ -20,14 +20,8 @@ public class WeatherService : IWeatherService
     };
 
 
-    public WeatherForecast GetWeatherForecast(DateTime date)
+    public WeatherForecast GetWeatherForecast(string date)
     {
-        _logger.LogInformation(date.ToString());
-        return new WeatherForecast
-        {
-            Date = DateOnly.FromDateTime(date),
-            TemperatureC = Random.Shared.Next(-20, 55),
-            Summary = Summaries[Random.Shared.Next(Summaries.Length)]
-        };
+        return null;
     }
 }
