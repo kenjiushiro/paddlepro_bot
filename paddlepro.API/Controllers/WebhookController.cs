@@ -1,7 +1,5 @@
-using Telegram.Bot;
 using Microsoft.AspNetCore.Mvc;
-using paddlepro.API.Models;
-using paddlepro.API.Services;
+using paddlepro.API.Services.Interfaces;
 
 namespace paddlepro.API.Controllers;
 

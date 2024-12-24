@@ -1,13 +1,12 @@
 using Telegram.Bot;
-using paddlepro.API.Services;
+using paddlepro.API.Services.Implementations;
+using paddlepro.API.Services.Interfaces;
 using System.Text.Json;
 using paddlepro.API.Configurations;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
 // Add services to the container.
-
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
@@ -42,6 +41,15 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>(client =>
         { "key", apiKey }
     };
     client.BaseAddress = new Uri($"https://api.weatherapi.com/v1/forecast.json?q=Buenos%20Aires&key={apiKey}&days={days}");
+});
+
+builder.Services.AddHttpClient<IPaddleService, AtcService>(client =>
+{
+    var baseUrl = builder.Configuration["PaddleService:BaseUrl"];
+    var path = builder.Configuration["PaddleService:Path"];
+    var baseUri = new Uri(baseUrl + path);
+
+    client.BaseAddress = baseUri;
 });
 
 builder.Services.AddSingleton<ITelegramBotClient>(sp =>
