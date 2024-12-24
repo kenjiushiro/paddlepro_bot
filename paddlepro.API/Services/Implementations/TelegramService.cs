@@ -75,16 +75,16 @@ public class TelegramService : ITelegramService
       }
       else if (context.LastCommand.Contains(_telegramConfig.Commands.Search))
       {
-        await Search(chatId);
+        await Search(context);
       }
     }
     return true;
   }
 
-  public async Task Search(long? chatId)
+  public async Task Search(Context context)
   {
-    var context = _contextService.GetChatContext(chatId);
-    var response = await _botClient.SendMessage(chatId, $"Buscando dia {context.SelectedDate}", messageThreadId: context.MessageThreadId);
+    var availability = await _paddleService.GetAvailabilities(context.SelectedDate);
+    var response = await _botClient.SendMessage(context.ChatId, $"Buscando dia {context.SelectedDate}", messageThreadId: context.MessageThreadId);
   }
 
   public async Task SetDate(long? chatId)
@@ -185,7 +185,7 @@ public class TelegramService : ITelegramService
     }
     else
     {
-      await Search(chatId);
+      await Search(context);
     }
   }
 }

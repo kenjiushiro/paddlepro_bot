@@ -11,9 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
-    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-    options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
-    options.JsonSerializerOptions.WriteIndented = true;
+  options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+  options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
+  options.JsonSerializerOptions.WriteIndented = true;
 });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -33,34 +33,35 @@ builder.Services.AddSingleton<IContextService, ContextService>();
 
 builder.Services.AddHttpClient<IWeatherService, WeatherService>(client =>
 {
-    var baseUrl = builder.Configuration["WeatherService:BaseUrl"];
-    var apiKey = builder.Configuration["WeatherService:ApiKey"];
-    var days = builder.Configuration["PaddleService:DaysInAdvance"];
-    var baseUri = new Uri(baseUrl);
+  var baseUrl = builder.Configuration["WeatherService:BaseUrl"];
+  var apiKey = builder.Configuration["WeatherService:ApiKey"];
+  var days = builder.Configuration["PaddleService:DaysInAdvance"];
+  var baseUri = new Uri(baseUrl);
 
-    // Add query parameters
-    var queryParams = new Dictionary<string, string>
+  // Add query parameters
+  var queryParams = new Dictionary<string, string>
     {
         { "q", "Buenos%20Aires" },
         { "key", apiKey }
     };
-    client.BaseAddress = new Uri($"https://api.weatherapi.com/v1/forecast.json?q=Buenos%20Aires&key={apiKey}&days={days}");
+  client.BaseAddress = new Uri($"https://api.weatherapi.com/v1/forecast.json?q=Buenos%20Aires&key={apiKey}&days={days}");
 });
 
 builder.Services.AddHttpClient<IPaddleService, AtcService>(client =>
 {
-    var baseUrl = builder.Configuration["PaddleService:BaseUrl"];
-    var path = builder.Configuration["PaddleService:Path"];
-    var baseUri = new Uri(baseUrl + path);
+  var baseUrl = builder.Configuration["PaddleService:BaseUrl"];
+  var path = builder.Configuration["PaddleService:Path"];
+  var baseUri = new Uri(baseUrl + path);
+  client.DefaultRequestHeaders.UserAgent.ParseAdd("MyApp/1.0");
 
-    client.BaseAddress = baseUri;
+  client.BaseAddress = baseUri;
 });
 
 builder.Services.AddSingleton<ITelegramBotClient>(sp =>
 {
-    var botToken = builder.Configuration["BotConfiguration:BotToken"];
-    // TODO this might have a cleanr way to instantiate, read docu
-    return new TelegramBotClient(botToken);
+  var botToken = builder.Configuration["BotConfiguration:BotToken"];
+  // TODO this might have a cleanr way to instantiate, read docu
+  return new TelegramBotClient(botToken);
 });
 
 var app = builder.Build();

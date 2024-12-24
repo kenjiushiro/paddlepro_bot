@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace paddlepro.API.Models.Infrastructure;
 
 public class Condition
@@ -8,10 +10,15 @@ public class Condition
 
 public class DayWeather
 {
-  public float maxtemp_c { get; set; }
-  public double mintemp_c { get; set; }
-  public int daily_chance_of_rain { get; set; }
-  public int DailyWillItRain { get; set; }
+  [JsonPropertyName("maxtemp_c")]
+  public float MaxTempC { get; set; }
+
+  [JsonPropertyName("mintemp_c")]
+  public double MinTempC { get; set; }
+
+  [JsonPropertyName("daily_chance_of_rain")]
+  public int DailyChanceOfRain { get; set; }
+
   public Condition Condition { get; set; }
 }
 public class ForecastDay
