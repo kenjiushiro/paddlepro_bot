@@ -135,28 +135,11 @@ public class TelegramService : ITelegramService
     await SendPlayerCountMessage(context);
   }
 
-  private string EmojiHelper(string weatherCondition)
-  {
-    _logger.LogInformation("Weahter condition: {Condition}", weatherCondition);
-    switch (weatherCondition)
-    {
-      case "Sunny":
-        return "☀️";
-      case "Patchy rain nearby":
-        return "🌧️";
-      default:
-        return "";
-    }
-  }
-
   public async Task SendAvailableDates(long? chatId)
   {
     var dateRange = DateTime.Today.AddDays(_paddleConfig.DaysInAdvance);
     var forecast = await _weatherService.GetWeatherForecast();
-    foreach (var fore in forecast.Forecast.Forecastday)
-    {
-      _logger.LogInformation("Dia: {Dia} MaxTemp: {MaxTemp} MinTemp {MinTemp}", fore.Date, fore.Day.maxtemp_c, fore.Day.mintemp_c);
-    }
+
     var context = _contextService.GetChatContext(chatId);
 
     var inlineKeyboard = new InlineKeyboardMarkup();
@@ -167,12 +150,11 @@ public class TelegramService : ITelegramService
       var date = startDate.AddDays(i);
       var buttonDisplay = date.ToString("dddd dd-MM", new System.Globalization.CultureInfo("es-ES"));
       var buttonValue = date.ToString("yyyy-MM-dd");
-      var dayForecast = forecast.Forecast?.Forecastday?.SingleOrDefault(f => f.Date == buttonValue).Day;
-      var emoji = EmojiHelper(dayForecast?.Condition?.Text);
+      var dayForecast = forecast.SingleOrDefault(f => f.Day == buttonValue);
 
-      var rainEmoji = "🌧️";
+      var rainEmoji = "";
 
-      buttonDisplay = $"{buttonDisplay} {emoji} {Math.Round(dayForecast.mintemp_c)}°C-{Math.Round(dayForecast.maxtemp_c)}°C {rainEmoji} {dayForecast.DailyChanceOfRain}%";
+      buttonDisplay = $"{buttonDisplay} {dayForecast.Emoji} {dayForecast.MinTemp}°C-{dayForecast.MaxTemp}°C {rainEmoji} {dayForecast.ChanceOfRain}%";
       inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(buttonDisplay, buttonValue));
     }
 

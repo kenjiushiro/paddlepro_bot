@@ -1,8 +1,10 @@
 using Telegram.Bot;
 using paddlepro.API.Services.Implementations;
 using paddlepro.API.Services.Interfaces;
+using paddlepro.API.Profiles;
 using System.Text.Json;
 using paddlepro.API.Configurations;
+using AutoMapper;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +19,8 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddAutoMapper(typeof(WeatherProfile));
 
 builder.Services.Configure<WeatherServiceConfiguration>(builder.Configuration.GetSection("WeatherService"));
 builder.Services.Configure<TelegramConfiguration>(builder.Configuration.GetSection("Telegram"));
