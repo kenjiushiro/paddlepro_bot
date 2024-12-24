@@ -1,8 +1,8 @@
-﻿using paddlepro.API.Models.Application;
+﻿using paddlepro.API.Models.Infrastructure;
 
 namespace paddlepro.API.Services.Interfaces;
 
 public interface IWeatherService
 {
-    Task<WeatherForecast[]> GetWeatherForecast();
+  Task<ForecastDay[]> GetWeatherForecast();
 }

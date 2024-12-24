@@ -1,5 +1,4 @@
-﻿using paddlepro.API.Models;
-using paddlepro.API.Configurations;
+﻿using paddlepro.API.Configurations;
 using paddlepro.API.Services.Interfaces;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -24,20 +23,16 @@ public class AtcService : IPaddleService
     _config = config.Value;
   }
 
-  public async Task<Club[]> GetAvailabilities(string date)
+  public async Task<AtcResponse> GetAvailability(string date)
   {
     var queryParams = "?horario=19%3A30&tipoDeporte=7&dia=2024-12-24&placeId=69y7pkxfg";
     var response = await httpClient.GetAsync(queryParams);
 
     string responseBody = await response.Content.ReadAsStringAsync();
 
-    var atcResponse = JsonSerializer.Deserialize<AtcResponse>(
+    return JsonSerializer.Deserialize<AtcResponse>(
         responseBody,
         new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
     );
-
-    _logger.LogInformation("Response?: {Response}", atcResponse.PageProps.BookingsBySport.Length);
-
-    return Array.Empty<Club>();
   }
 }

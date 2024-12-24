@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Options;
 using paddlepro.API.Configurations;
 using paddlepro.API.Models.Infrastructure;
-using paddlepro.API.Models.Application;
 using paddlepro.API.Services.Interfaces;
 using AutoMapper;
 
@@ -28,7 +27,7 @@ public class WeatherService : IWeatherService
     _mapper = mapper;
   }
 
-  public async Task<Models.Application.WeatherForecast[]> GetWeatherForecast()
+  public async Task<ForecastDay[]> GetWeatherForecast()
   {
     var response = await _httpClient.GetAsync("");
     string responseBody = await response.Content.ReadAsStringAsync();
@@ -38,6 +37,6 @@ public class WeatherService : IWeatherService
         new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
     );
 
-    return _mapper.Map<Models.Application.WeatherForecast[]>(weatherResponse.Forecast.Forecastday);
+    return weatherResponse.Forecast.Forecastday;
   }
 }

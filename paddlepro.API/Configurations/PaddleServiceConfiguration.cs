@@ -7,5 +7,5 @@ public class PaddleServiceConfiguration
   public string Path { get; set; } = "";
   public int DaysInAdvance { get; set; }
   public int PlayerCount { get; set; }
-  public int[] ClubIds { get; set; } = new int[0];
+  public string[] ClubIds { get; set; } = new string[0];
 }

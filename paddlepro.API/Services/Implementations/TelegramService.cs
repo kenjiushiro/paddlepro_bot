@@ -5,6 +5,8 @@ using Telegram.Bot.Types.ReplyMarkups;
 using paddlepro.API.Configurations;
 using paddlepro.API.Models;
 using paddlepro.API.Services.Interfaces;
+using paddlepro.API.Models.Application;
+using AutoMapper;
 
 namespace paddlepro.API.Services.Implementations;
 
@@ -17,6 +19,7 @@ public class TelegramService : ITelegramService
   IPaddleService _paddleService;
   IContextService _contextService;
   IWeatherService _weatherService;
+  IMapper _mapper;
 
   private static Dictionary<string, long?> pollChatIdDict = new Dictionary<string, long?>();
   List<InputPollOption> options = new List<InputPollOption> { new InputPollOption("Si"), new InputPollOption("No") };
@@ -28,7 +31,8 @@ public class TelegramService : ITelegramService
       IContextService contextService,
       ILogger<TelegramService> logger,
       IOptions<PaddleServiceConfiguration> paddleConfig,
-      IOptions<TelegramConfiguration> telegramConfig
+      IOptions<TelegramConfiguration> telegramConfig,
+      IMapper mapper
       )
   {
     _botClient = botClient;
@@ -38,8 +42,10 @@ public class TelegramService : ITelegramService
     _weatherService = weatherService;
     _paddleConfig = paddleConfig.Value;
     _telegramConfig = telegramConfig.Value;
+    _mapper = mapper;
   }
 
+  // TODO better organize all these methods
   public async Task<bool> Respond(Update update)
   {
     if (update.Type == Telegram.Bot.Types.Enums.UpdateType.Message)
@@ -81,10 +87,29 @@ public class TelegramService : ITelegramService
     return true;
   }
 
+  private string GetCourtMessage(Models.Application.Court court)
+  {
+    var roofed = court.IsRoofed ? "Techada" : "No techada";
+
+    return @$"{court.Name} - {court.SurfaceType} {roofed}";
+  }
+
+  private string GetMessage(Club[] clubs)
+  {
+    return string.Join("\n", clubs
+        .Select(club => @$"
+🏟️ {club.Name} - 📍 {club.Location.Address}
+Canchas:
+{string.Join("\n", club.Courts.Select(c => GetCourtMessage(c)))}"));
+  }
+
   public async Task Search(Context context)
   {
-    var availability = await _paddleService.GetAvailabilities(context.SelectedDate);
-    var response = await _botClient.SendMessage(context.ChatId, $"Buscando dia {context.SelectedDate}", messageThreadId: context.MessageThreadId);
+    var availability = _mapper.Map<Availability>(await _paddleService.GetAvailability(context.SelectedDate));
+    var clubs = availability.Clubs.Where(x => _paddleConfig.ClubIds.ToList().Contains(x.Id)).ToArray();
+    var message = GetMessage(clubs);
+
+    var response = await _botClient.SendMessage(context.ChatId, message, messageThreadId: context.MessageThreadId, disableNotification: true);
   }
 
   public async Task SetDate(long? chatId)
@@ -138,7 +163,7 @@ public class TelegramService : ITelegramService
   public async Task SendAvailableDates(long? chatId)
   {
     var dateRange = DateTime.Today.AddDays(_paddleConfig.DaysInAdvance);
-    var forecast = await _weatherService.GetWeatherForecast();
+    var forecast = _mapper.Map<WeatherForecast[]>(await _weatherService.GetWeatherForecast());
 
     var context = _contextService.GetChatContext(chatId);
 
@@ -154,11 +179,11 @@ public class TelegramService : ITelegramService
 
       var rainEmoji = "";
 
-      buttonDisplay = $"{buttonDisplay} {dayForecast.Emoji} {dayForecast.MinTemp}°C-{dayForecast.MaxTemp}°C {rainEmoji} {dayForecast.ChanceOfRain}%";
+      buttonDisplay = $"{buttonDisplay} {dayForecast?.Emoji} {dayForecast?.MinTemp}°C-{dayForecast?.MaxTemp}°C {rainEmoji} {dayForecast?.ChanceOfRain}%";
       inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(buttonDisplay, buttonValue));
     }
 
-    var message = await _botClient.SendMessage(chatId, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard);
+    var message = await _botClient.SendMessage(chatId, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);
     context.LatestDayPicker = message.MessageId;
   }
 

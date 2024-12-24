@@ -1,8 +1,8 @@
-﻿using paddlepro.API.Models;
+﻿using paddlepro.API.Models.Infrastructure;
 
 namespace paddlepro.API.Services.Interfaces;
 
 public interface IPaddleService
 {
-  Task<Club[]> GetAvailabilities(string date);
+  Task<AtcResponse> GetAvailability(string date);
 }
