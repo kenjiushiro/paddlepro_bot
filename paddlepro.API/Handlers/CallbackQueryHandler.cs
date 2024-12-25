@@ -5,7 +5,6 @@ using Telegram.Bot.Types.ReplyMarkups;
 using paddlepro.API.Configurations;
 using paddlepro.API.Models;
 using paddlepro.API.Services;
-using paddlepro.API.Handlers;
 using paddlepro.API.Helpers;
 using paddlepro.API.Services.Interfaces;
 using paddlepro.API.Models.Application;
@@ -15,21 +14,20 @@ namespace paddlepro.API.Handlers;
 
 public class CallbackQueryHandler : IUpdateHandler
 {
-  private readonly ILogger<CallbackQueryHandler> _logger;
-  private readonly IContextService _contextService;
-  private readonly ITelegramBotClient _botClient;
-  private readonly PaddleServiceConfiguration _paddleConfig;
-  private readonly TelegramConfiguration _telegramConfig;
-  private readonly IPaddleService _paddleService;
-  private readonly IWeatherService _weatherService;
-  private readonly IMapper _mapper;
+  private readonly ILogger<CallbackQueryHandler> logger;
+  private readonly IContextService contextService;
+  private readonly ITelegramBotClient botClient;
+  private readonly PaddleServiceConfiguration paddleConfig;
+  private readonly TelegramConfiguration telegramConfig;
+  private readonly IPaddleService paddleService;
+  private readonly IMapper mapper;
+
   private List<InputPollOption> options = new List<InputPollOption> { new InputPollOption("Si"), new InputPollOption("No") };
 
 
   public CallbackQueryHandler(
       ITelegramBotClient botClient,
       IPaddleService paddleService,
-      IWeatherService weatherService,
       IContextService contextService,
       ILogger<CallbackQueryHandler> logger,
       IOptions<PaddleServiceConfiguration> paddleConfig,
@@ -37,40 +35,58 @@ public class CallbackQueryHandler : IUpdateHandler
       IMapper mapper
       )
   {
-    _botClient = botClient;
-    _logger = logger;
-    _contextService = contextService;
-    _paddleService = paddleService;
-    _weatherService = weatherService;
-    _paddleConfig = paddleConfig.Value;
-    _telegramConfig = telegramConfig.Value;
-    _mapper = mapper;
+    this.botClient = botClient;
+    this.logger = logger;
+    this.contextService = contextService;
+    this.paddleService = paddleService;
+    this.paddleConfig = paddleConfig.Value;
+    this.telegramConfig = telegramConfig.Value;
+    this.mapper = mapper;
   }
+
 
   public async Task<bool> Handle(Update update)
   {
+    Dictionary<string, Func<Update, Context, string, Task<bool>>> commands = new Dictionary<string, Func<Update, Context, string, Task<bool>>>
+    {
+      { Common.PICK_DATE_COMMAND, HandleDatePick },
+      { Common.PICK_COURT_COMMAND, HandleCourtPick },
+      { Common.PICK_HOUR_COMMAND, HandleHourPick },
+      { Common.SCHEDULE_REMINDER_COMMAND, ScheduleReminder },
+    };
+
     var chatId = update?.CallbackQuery?.Message?.Chat.Id;
-    var context = _contextService.GetChatContext(chatId);
+    var context = this.contextService.GetChatContext(chatId);
     (var action, var callbackValue) = Common.DecodeCallback(update?.CallbackQuery?.Data);
-    _logger.LogInformation("Handling callback query: {action}", action);
 
-    if (action == Common.PICK_DATE_COMMAND)
+    if (!commands.TryGetValue(action, out var actionHandler))
     {
-      await HandleDatePick(update, context, callbackValue);
-    }
-    else if (action == Common.PICK_COURT_COMMAND)
-    {
-      await HandleCourtPick(update, context, callbackValue);
-    }
-    else if (action == Common.PICK_HOUR_COMMAND)
-    {
-      await HandleStartPick(update, context, callbackValue);
-    }
-    else if (action == Common.SCHEDULE_REMINDER_COMMAND)
-    {
-      await ScheduleReminder(update, context, callbackValue);
+      this.logger.LogWarning("Couldn'f find callback query action {Action}}", action);
+      return false;
     }
 
+    this.logger.LogInformation("Handling callback query: {Action}", action);
+    return await actionHandler(update, context, callbackValue);
+  }
+
+  private async Task<bool> ScheduleReminder(Update update, Context context, string selection)
+  {
+    (var clubId, var courtId, var start, var duration) = selection.SplitBy4("+");
+    var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
+    var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
+    var court = club.Courts.FirstOrDefault(c => c.Id == courtId);
+
+    var message = @$"Detalles del partido:
+🏟️ {club.Name} - 📍 {club.Location.Address} - {context.SelectedDate}
+{court.Name} - {start} {duration}min
+        ";
+
+    var response = await this.botClient.SendMessage(
+        context.ChatId,
+        message,
+        messageThreadId: context.MessageThreadId,
+        disableNotification: true);
+    await this.botClient.PinChatMessage(context.ChatId, response.MessageId, disableNotification: true);
     return true;
   }
 
@@ -84,56 +100,57 @@ public class CallbackQueryHandler : IUpdateHandler
 
     if (chatId == null)
     {
-      _logger.LogWarning("Chat ID null for update {Id} on ReadyCheckPoll step", update.Id);
+      this.logger.LogWarning("Chat ID null for update {Id} on ReadyCheckPoll step", update.Id);
     }
 
     if (matchDate == null)
     {
-      _logger.LogWarning("Match Date returned null from Update Id {Id}", update.Id);
+      this.logger.LogWarning("Match Date returned null from Update Id {Id}", update.Id);
     }
 
-    var context = _contextService.GetChatContext(chatId);
+    var context = this.contextService.GetChatContext(chatId);
     context.SelectedDate = matchDate;
     if (context.LatestDayPicker > 0)
     {
-      /*_botClient.DeleteMessage(context.ChatId, context.LatestDayPicker);*/
+      /*this.botClient.DeleteMessage(context.ChatId, context.LatestDayPicker);*/
       context.LatestDayPicker = 0;
     }
   }
 
 
-  private async Task StartReadyCheckPoll(long? chatId)
+  private async Task<bool> StartReadyCheckPoll(long? chatId)
   {
-    var context = _contextService.GetChatContext(chatId);
+    var context = this.contextService.GetChatContext(chatId);
     if (context.LatestPollId > 0)
     {
-      _botClient.DeleteMessage(context.ChatId, context.LatestPollId);
+      this.botClient.DeleteMessage(context.ChatId, context.LatestPollId);
       context.LatestPollId = 0;
     }
 
-    var poll = await _botClient.SendPoll(context.ChatId, $"Estas para jugar el {context.SelectedDate}?", options, isAnonymous: false, messageThreadId: context.MessageThreadId, disableNotification: true);
+    var poll = await this.botClient.SendPoll(context.ChatId, $"Estas para jugar el {context.SelectedDate}?", options, isAnonymous: false, messageThreadId: context.MessageThreadId, disableNotification: true);
     context.LatestPollId = poll.MessageId;
     Common.pollChatIdDict.Add(poll.Poll.Id, chatId);
     await SendPlayerCountMessage(context);
+    return true;
   }
 
-  private async Task HandleDatePick(Update update, Context context, string selection)
+  private async Task<bool> HandleDatePick(Update update, Context context, string selection)
   {
     await OnDateSelected(update, selection);
-    if (context.LastCommand.Contains(_telegramConfig.Commands.ReadyCheck))
+    if (context.LastCommand.Contains(this.telegramConfig.Commands.ReadyCheck))
     {
-      await StartReadyCheckPoll(context.ChatId);
+      return await StartReadyCheckPoll(context.ChatId);
     }
-    else if (context.LastCommand.Contains(_telegramConfig.Commands.Search))
+    else if (context.LastCommand.Contains(this.telegramConfig.Commands.Search))
     {
-      await Search(context);
+      return await Search(context);
     }
-
+    return false;
   }
 
-  private async Task HandleCourtPick(Update update, Context context, string selection)
+  private async Task<bool> HandleCourtPick(Update update, Context context, string selection)
   {
-    var availability = _mapper.Map<Availability>(await _paddleService.GetAvailability(context.SelectedDate));
+    var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
     (var clubId, var courtId) = selection.SplitBy(":");
     var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
     var court = club.Courts.FirstOrDefault(c => c.Id == courtId);
@@ -149,52 +166,35 @@ public class CallbackQueryHandler : IUpdateHandler
         }).ToArray();
 
     InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons);
-    var response = await _botClient.SendMessage(
+    var response = await this.botClient.SendMessage(
         context.ChatId,
         $"Reservar {club.Name} {court.Name}",
         messageThreadId: context.MessageThreadId,
         disableNotification: true,
         replyMarkup: inlineKeyboard
         );
+    return true;
   }
 
-  private async Task ScheduleReminder(Update update, Context context, string selection)
-  {
-    (var clubId, var courtId, var start, var duration) = selection.SplitBy4("+");
-    var availability = _mapper.Map<Availability>(await _paddleService.GetAvailability(context.SelectedDate));
-    var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
-    var court = club.Courts.FirstOrDefault(c => c.Id == courtId);
-
-    var message = @$"Detalles del partido:
-🏟️ {club.Name} - 📍 {club.Location.Address} - {context.SelectedDate}
-{court.Name} - {start} {duration}min
-        ";
-
-    var response = await _botClient.SendMessage(
-        context.ChatId,
-        message,
-        messageThreadId: context.MessageThreadId,
-        disableNotification: true);
-    await _botClient.PinChatMessage(context.ChatId, response.MessageId, disableNotification: true);
-  }
-
-  private async Task HandleStartPick(Update update, Context context, string selection)
+  private async Task<bool> HandleHourPick(Update update, Context context, string selection)
   {
     (var clubId, var courtId, var start, var duration) = selection.SplitBy4("+");
 
     InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup();
-    var url = _paddleService.GetCheckoutUrl(clubId, context.SelectedDate, courtId, start, duration);
+    var url = this.paddleService.GetCheckoutUrl(clubId, context.SelectedDate, courtId, start, duration);
     inlineKeyboard.AddNewRow(InlineKeyboardButton.WithUrl("Reservar", url));
     inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData("Activar recordatorio", Common.EncodeCallback(Common.SCHEDULE_REMINDER_COMMAND, selection)));
 
-    var response = await _botClient.SendMessage(
+    var response = await this.botClient.SendMessage(
         context.ChatId,
         text: $"Reservar {start} {duration}min",
         messageThreadId: context.MessageThreadId,
         disableNotification: true,
         replyMarkup: inlineKeyboard
         );
+    return true;
   }
+
   private string GetAvailabilityMessage(Models.Application.Court court)
   {
     return court.Availability.Select(a => @$"
@@ -216,10 +216,10 @@ public class CallbackQueryHandler : IUpdateHandler
 {club.Courts.Select(c => GetCourtMessage(c)).Join("\n")}||";
   }
 
-  private async Task Search(Context context)
+  private async Task<bool> Search(Context context)
   {
-    var availability = _mapper.Map<Availability>(await _paddleService.GetAvailability(context.SelectedDate));
-    var clubs = availability.Clubs.Where(x => _paddleConfig.ClubIds.ToList().Contains(x.Id)).ToArray();
+    var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
+    var clubs = availability.Clubs.Where(x => this.paddleConfig.ClubIds.ToList().Contains(x.Id)).ToArray();
 
     foreach (var club in clubs)
     {
@@ -240,7 +240,7 @@ public class CallbackQueryHandler : IUpdateHandler
           }
           ).ToArray();
       InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons);
-      var response = await _botClient.SendMessage(
+      var response = await this.botClient.SendMessage(
           context.ChatId,
           message,
           messageThreadId: context.MessageThreadId,
@@ -248,13 +248,12 @@ public class CallbackQueryHandler : IUpdateHandler
           replyMarkup: inlineKeyboard,
           parseMode: Telegram.Bot.Types.Enums.ParseMode.MarkdownV2);
     }
-
+    return true;
   }
 
   private async Task SendPlayerCountMessage(Context context, string messageText = "Faltan 4 votos")
   {
-    var countMessage = await _botClient.SendMessage(context.ChatId, messageText, messageThreadId: context.MessageThreadId, disableNotification: true);
+    var countMessage = await this.botClient.SendMessage(context.ChatId, messageText, messageThreadId: context.MessageThreadId, disableNotification: true);
     context.CountMessageId = countMessage.MessageId;
   }
-
 }

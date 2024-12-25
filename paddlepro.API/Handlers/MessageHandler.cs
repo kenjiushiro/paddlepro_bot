@@ -12,18 +12,16 @@ namespace paddlepro.API.Handlers;
 
 public class MessageHandler : IUpdateHandler
 {
-  ITelegramBotClient _botClient;
-  ILogger<MessageHandler> _logger;
-  PaddleServiceConfiguration _paddleConfig;
-  TelegramConfiguration _telegramConfig;
-  IPaddleService _paddleService;
-  IContextService _contextService;
-  IWeatherService _weatherService;
-  IMapper _mapper;
+  ITelegramBotClient botClient;
+  ILogger<MessageHandler> logger;
+  PaddleServiceConfiguration paddleConfig;
+  TelegramConfiguration telegramConfig;
+  IContextService contextService;
+  IWeatherService weatherService;
+  IMapper mapper;
 
   public MessageHandler(
       ITelegramBotClient botClient,
-      IPaddleService paddleService,
       IWeatherService weatherService,
       IContextService contextService,
       ILogger<MessageHandler> logger,
@@ -32,14 +30,13 @@ public class MessageHandler : IUpdateHandler
       IMapper mapper
       )
   {
-    _botClient = botClient;
-    _logger = logger;
-    _contextService = contextService;
-    _paddleService = paddleService;
-    _weatherService = weatherService;
-    _paddleConfig = paddleConfig.Value;
-    _telegramConfig = telegramConfig.Value;
-    _mapper = mapper;
+    this.botClient = botClient;
+    this.logger = logger;
+    this.contextService = contextService;
+    this.weatherService = weatherService;
+    this.paddleConfig = paddleConfig.Value;
+    this.telegramConfig = telegramConfig.Value;
+    this.mapper = mapper;
   }
 
   public async Task<bool> Handle(Update update)
@@ -47,14 +44,14 @@ public class MessageHandler : IUpdateHandler
     var chatId = update?.Message?.Chat.Id;
     var threadId = update?.Message?.MessageThreadId;
     var command = update?.Message?.Text ?? "";
-    _logger.LogInformation("Handling message: {Message}", command);
+    this.logger.LogInformation("Handling message: {Message}", command);
 
-    if (!command.Contains(_telegramConfig.Commands.ReadyCheck) && !command.Contains(_telegramConfig.Commands.Search))
+    if (!command.Contains(this.telegramConfig.Commands.ReadyCheck) && !command.Contains(this.telegramConfig.Commands.Search))
     {
       return false;
     }
-    _logger.LogInformation("Command: {Command}", command);
-    _contextService.SetChatContext(chatId, threadId, "", command);
+    this.logger.LogInformation("Command: {Command}", command);
+    this.contextService.SetChatContext(chatId, threadId, "", command);
     await SendAvailableDates(chatId);
     return true;
   }
@@ -62,15 +59,15 @@ public class MessageHandler : IUpdateHandler
 
   private async Task SendAvailableDates(long? chatId)
   {
-    var dateRange = DateTime.Today.AddDays(_paddleConfig.DaysInAdvance);
-    var forecast = _mapper.Map<WeatherForecast[]>(await _weatherService.GetWeatherForecast());
+    var dateRange = DateTime.Today.AddDays(this.paddleConfig.DaysInAdvance);
+    var forecast = this.mapper.Map<WeatherForecast[]>(await this.weatherService.GetWeatherForecast());
 
-    var context = _contextService.GetChatContext(chatId);
+    var context = this.contextService.GetChatContext(chatId);
 
     var inlineKeyboard = new InlineKeyboardMarkup();
 
     DateTime startDate = DateTime.UtcNow;
-    for (var i = 0; i < _paddleConfig.DaysInAdvance; i++)
+    for (var i = 0; i < this.paddleConfig.DaysInAdvance; i++)
     {
       var date = startDate.AddDays(i);
       var buttonDisplay = date.ToString("dddd dd-MM", new System.Globalization.CultureInfo("es-ES"));
@@ -83,7 +80,7 @@ public class MessageHandler : IUpdateHandler
       inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(buttonDisplay, Common.EncodeCallback(Common.PICK_DATE_COMMAND, buttonValue)));
     }
 
-    var message = await _botClient.SendMessage(chatId, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);
+    var message = await this.botClient.SendMessage(chatId, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);
     context.LatestDayPicker = message.MessageId;
   }
 }

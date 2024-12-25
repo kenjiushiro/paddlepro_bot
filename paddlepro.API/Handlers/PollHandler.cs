@@ -14,51 +14,45 @@ namespace paddlepro.API.Handlers;
 
 public class PollHandler : IUpdateHandler
 {
-  ITelegramBotClient _botClient;
-  ILogger<PollHandler> _logger;
-  PaddleServiceConfiguration _paddleConfig;
-  TelegramConfiguration _telegramConfig;
-  IPaddleService _paddleService;
-  IContextService _contextService;
-  IWeatherService _weatherService;
-  IMapper _mapper;
+  ITelegramBotClient botClient;
+  ILogger<PollHandler> logger;
+  PaddleServiceConfiguration paddleConfig;
+  IPaddleService paddleService;
+  IContextService contextService;
+  IMapper mapper;
 
   public PollHandler(
       ITelegramBotClient botClient,
       IPaddleService paddleService,
-      IWeatherService weatherService,
       IContextService contextService,
       ILogger<PollHandler> logger,
       IOptions<PaddleServiceConfiguration> paddleConfig,
-      IOptions<TelegramConfiguration> telegramConfig,
       IMapper mapper
       )
   {
-    _botClient = botClient;
-    _logger = logger;
-    _contextService = contextService;
-    _paddleService = paddleService;
-    _weatherService = weatherService;
-    _paddleConfig = paddleConfig.Value;
-    _telegramConfig = telegramConfig.Value;
-    _mapper = mapper;
+    this.botClient = botClient;
+    this.logger = logger;
+    this.contextService = contextService;
+    this.paddleService = paddleService;
+    this.paddleConfig = paddleConfig.Value;
+    this.mapper = mapper;
   }
 
   public async Task<bool> Handle(Update update)
   {
     var count = update?.Poll?.Options.Single(o => o.Text == "Si").VoterCount;
-    _logger.LogInformation("Handling poll");
+    this.logger.LogInformation("Handling poll");
     if (!Common.pollChatIdDict.TryGetValue(update.Poll.Id, out var chatId))
     {
-      _logger.LogWarning("Poll ID {Id} not found", update.Poll.Id);
+      this.logger.LogWarning("Poll ID {Id} not found", update.Poll.Id);
       return false;
     }
-    var context = _contextService.GetChatContext(chatId);
+    var context = this.contextService.GetChatContext(chatId);
 
-    if (count < _paddleConfig.PlayerCount)
+    if (count < this.paddleConfig.PlayerCount)
     {
-      var messageText = $"Faltan {_paddleConfig.PlayerCount - count} votos";
-      await _botClient.EditMessageText(context.ChatId, context.CountMessageId, messageText);
+      var messageText = $"Faltan {this.paddleConfig.PlayerCount - count} votos";
+      await this.botClient.EditMessageText(context.ChatId, context.CountMessageId, messageText);
       return true;
     }
     else
@@ -91,8 +85,8 @@ public class PollHandler : IUpdateHandler
 
   private async Task Search(Context context)
   {
-    var availability = _mapper.Map<Availability>(await _paddleService.GetAvailability(context.SelectedDate));
-    var clubs = availability.Clubs.Where(x => _paddleConfig.ClubIds.ToList().Contains(x.Id)).ToArray();
+    var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
+    var clubs = availability.Clubs.Where(x => this.paddleConfig.ClubIds.ToList().Contains(x.Id)).ToArray();
 
     foreach (var club in clubs)
     {
@@ -113,7 +107,7 @@ public class PollHandler : IUpdateHandler
           }
           ).ToArray();
       InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons);
-      var response = await _botClient.SendMessage(
+      var response = await this.botClient.SendMessage(
           context.ChatId,
           message,
           messageThreadId: context.MessageThreadId,

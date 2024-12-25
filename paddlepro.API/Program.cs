@@ -31,9 +31,9 @@ builder.Services.Configure<PaddleServiceConfiguration>(builder.Configuration.Get
 builder.Services.AddScoped<IWeatherService, WeatherService>();
 builder.Services.AddScoped<IPaddleService, AtcService>();
 
-builder.Services.AddScoped<IUpdateHandler, MessageHandler>();
-builder.Services.AddScoped<IUpdateHandler, CallbackQueryHandler>();
-builder.Services.AddScoped<IUpdateHandler, PollHandler>();
+builder.Services.AddScoped<MessageHandler>();
+builder.Services.AddScoped<CallbackQueryHandler>();
+builder.Services.AddScoped<PollHandler>();
 
 builder.Services.AddScoped<UpdateDispatcher>();
 
@@ -42,11 +42,11 @@ builder.Services.AddTransient<HandlerResolver>(serviceProvider => key =>
   switch (key)
   {
     case UpdateType.Message:
-      return serviceProvider.GetService<MessageHandler>();
+      return serviceProvider.GetService<MessageHandler>()!;
     case UpdateType.CallbackQuery:
-      return serviceProvider.GetService<CallbackQueryHandler>();
+      return serviceProvider.GetService<CallbackQueryHandler>()!;
     case UpdateType.Poll:
-      return serviceProvider.GetService<PollHandler>();
+      return serviceProvider.GetService<PollHandler>()!;
     default:
       throw new KeyNotFoundException();
   }
@@ -59,12 +59,12 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>(client =>
   var baseUrl = builder.Configuration["WeatherService:BaseUrl"];
   var apiKey = builder.Configuration["WeatherService:ApiKey"];
   var days = builder.Configuration["PaddleService:DaysInAdvance"];
-  var baseUri = new Uri(baseUrl);
+  var baseUri = new Uri(baseUrl!);
 
   // Add query parameters
   var queryParams = new Dictionary<string, string>
     {
-        { "q", "Buenos%20Aires" },
+    { "q", "Buenos%20Aires" },
         { "key", apiKey }
     };
   client.BaseAddress = new Uri($"https://api.weatherapi.com/v1/forecast.json?q=Buenos%20Aires&key={apiKey}&days={days}");
