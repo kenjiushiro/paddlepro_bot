@@ -4,6 +4,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 using paddlepro.API.Configurations;
 using paddlepro.API.Models;
+using paddlepro.API.Helpers;
 using paddlepro.API.Services.Interfaces;
 using paddlepro.API.Models.Application;
 using AutoMapper;
@@ -73,18 +74,101 @@ public class TelegramService : ITelegramService
         {
             // Date selected
             var chatId = update?.CallbackQuery?.Message?.Chat.Id;
-            await OnDateSelected(update);
             var context = _contextService.GetChatContext(chatId);
-            if (context.LastCommand.Contains(_telegramConfig.Commands.ReadyCheck))
+            (var action, var callbackValue) = DecodeCallback(update?.CallbackQuery?.Data);
+            _logger.LogInformation("Action: {action}", action);
+
+            if (action == "DatePick")
             {
-                await StartReadyCheckPoll(chatId);
+                await OnDateSelected(update, callbackValue);
+                if (context.LastCommand.Contains(_telegramConfig.Commands.ReadyCheck))
+                {
+                    await StartReadyCheckPoll(chatId);
+                }
+                else if (context.LastCommand.Contains(_telegramConfig.Commands.Search))
+                {
+                    await Search(context);
+                }
             }
-            else if (context.LastCommand.Contains(_telegramConfig.Commands.Search))
+            else if (action == "CourtPick")
             {
-                await Search(context);
+                await HandleCourtPick(update, context, callbackValue);
+            }
+            else if (action == "StartPick")
+            {
+                await HandleStartPick(update, context, callbackValue);
+            }
+            else if (action == "ScheduleReminder")
+            {
+                await ScheduleReminder(update, context, callbackValue);
             }
         }
         return true;
+    }
+
+    private async Task HandleCourtPick(Update update, Context context, string selection)
+    {
+        var availability = _mapper.Map<Availability>(await _paddleService.GetAvailability(context.SelectedDate));
+        (var clubId, var courtId) = selection.SplitBy(":");
+        var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
+        var court = club.Courts.FirstOrDefault(c => c.Id == courtId);
+
+        var buttons = court.Availability.Select(
+            a =>
+            {
+                var value = $"{clubId}+{courtId}+{a.Start}+{a.Duration}";
+                return new[]
+                    {
+                    InlineKeyboardButton.WithCallbackData($"{a.Start} {a.Duration}min ${a.Price}", EncodeCallback("StartPick", value)),
+              };
+            }).ToArray();
+
+        InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons);
+        var response = await _botClient.SendMessage(
+            context.ChatId,
+            $"Reservar {club.Name} {court.Name}",
+            messageThreadId: context.MessageThreadId,
+            disableNotification: true,
+            replyMarkup: inlineKeyboard
+            );
+    }
+
+    private async Task ScheduleReminder(Update update, Context context, string selection)
+    {
+        (var clubId, var courtId, var start, var duration) = selection.SplitBy4("+");
+        var availability = _mapper.Map<Availability>(await _paddleService.GetAvailability(context.SelectedDate));
+        var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
+        var court = club.Courts.FirstOrDefault(c => c.Id == courtId);
+
+        var message = @$"Detalles del partido:
+🏟️ {club.Name} - 📍 {club.Location.Address} - {context.SelectedDate}
+{court.Name} - {start} {duration}min
+        ";
+
+        var response = await _botClient.SendMessage(
+            context.ChatId,
+            message,
+            messageThreadId: context.MessageThreadId,
+            disableNotification: true);
+        await _botClient.PinChatMessage(context.ChatId, response.MessageId, disableNotification: true);
+    }
+
+    public async Task HandleStartPick(Update update, Context context, string selection)
+    {
+        (var clubId, var courtId, var start, var duration) = selection.SplitBy4("+");
+
+        InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup();
+        var url = _paddleService.GetCheckoutUrl(clubId, context.SelectedDate, courtId, start, duration);
+        inlineKeyboard.AddNewRow(InlineKeyboardButton.WithUrl("Reservar", url));
+        inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData("Activar recordatorio", EncodeCallback("ScheduleReminder", selection)));
+
+        var response = await _botClient.SendMessage(
+            context.ChatId,
+            text: "Reservar",
+            messageThreadId: context.MessageThreadId,
+            disableNotification: true,
+            replyMarkup: inlineKeyboard
+            );
     }
 
     private string EscapeCharsForMarkdown(string body)
@@ -94,34 +178,58 @@ public class TelegramService : ITelegramService
     }
     private string GetAvailabilityMessage(Models.Application.Court court)
     {
-        return string.Join("\n", court.Availability.Select(a => @$">{a.Start} - {a.Duration}min - ${a.Price}"));
+        return string.Join("", court.Availability.Select(a => @$"
+>{a.Start} - {a.Duration}min - ${a.Price}"));
     }
 
     private string GetCourtMessage(Models.Application.Court court)
     {
         var roofed = court.IsRoofed ? "Techada" : "No techada";
 
-        return @$">{court.Name} - {roofed}
-{GetAvailabilityMessage(court)}";
+        return @$">{court.Name} - {roofed} {GetAvailabilityMessage(court)}";
     }
 
-    private string GetMessage(Club[] clubs, string date)
+    private string GetClubMessage(Club club, string date)
     {
-        return string.Join("\n", clubs
-            .Select(club => @$"
+        return @$"
 *🏟️ {club.Name} - 📍 {club.Location.Address} - {date}*
 **>Canchas:
-{string.Join("\n", club.Courts.Select(c => GetCourtMessage(c)))}||"));
+{string.Join("\n", club.Courts.Select(c => GetCourtMessage(c)))}||";
     }
 
     public async Task Search(Context context)
     {
         var availability = _mapper.Map<Availability>(await _paddleService.GetAvailability(context.SelectedDate));
         var clubs = availability.Clubs.Where(x => _paddleConfig.ClubIds.ToList().Contains(x.Id)).ToArray();
-        var message = EscapeCharsForMarkdown(GetMessage(clubs, context.SelectedDate));
-        _logger.LogInformation(message);
 
-        var response = await _botClient.SendMessage(context.ChatId, message, messageThreadId: context.MessageThreadId, disableNotification: true, parseMode: Telegram.Bot.Types.Enums.ParseMode.MarkdownV2);
+        foreach (var club in clubs)
+        {
+            if (club.Courts.All(c => c.Availability.Length == 0))
+            {
+                continue;
+            }
+            var message = EscapeCharsForMarkdown(GetClubMessage(club, context.SelectedDate));
+            var buttons = club.Courts.Where(c => c.Availability.Length > 0).Select(
+                c =>
+                {
+                    var value = $"{club.Id}:{c.Id}";
+                    return new[]
+                    {
+                InlineKeyboardButton.WithCallbackData($"{club.Name} - {c.Name} ", EncodeCallback("CourtPick", value)),
+            };
+
+                }
+                ).ToArray();
+            InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons);
+            var response = await _botClient.SendMessage(
+                context.ChatId,
+                message,
+                messageThreadId: context.MessageThreadId,
+                disableNotification: true,
+                replyMarkup: inlineKeyboard,
+                parseMode: Telegram.Bot.Types.Enums.ParseMode.MarkdownV2);
+        }
+
     }
 
     public async Task SetDate(long? chatId)
@@ -131,12 +239,22 @@ public class TelegramService : ITelegramService
         await _botClient.PinChatMessage(chatId, message.MessageId);
     }
 
-    public async Task OnDateSelected(Update update)
+    private string EncodeCallback(string action, string data)
+    {
+        return $"{action};{data}";
+    }
+
+    private (string, string) DecodeCallback(string callback)
+    {
+        return callback.SplitBy(";");
+    }
+
+    public async Task OnDateSelected(Update update, string date)
     {
         var chatId = update?.CallbackQuery?.Message?.Chat.Id;
         var threadId = update?.CallbackQuery?.Message?.MessageThreadId;
 
-        var matchDate = update?.CallbackQuery?.Data;
+        var matchDate = date;
 
         if (chatId == null)
         {
@@ -192,7 +310,7 @@ public class TelegramService : ITelegramService
             var rainEmoji = "";
 
             buttonDisplay = $"{buttonDisplay} {dayForecast?.Emoji} {dayForecast?.MinTemp}°C-{dayForecast?.MaxTemp}°C {rainEmoji} {dayForecast?.ChanceOfRain}%";
-            inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(buttonDisplay, buttonValue));
+            inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(buttonDisplay, EncodeCallback("DatePick", buttonValue)));
         }
 
         var message = await _botClient.SendMessage(chatId, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);

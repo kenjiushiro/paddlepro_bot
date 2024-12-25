@@ -23,10 +23,17 @@ public class AtcService : IPaddleService
         _config = config.Value;
     }
 
+    public string GetCheckoutUrl(string clubId, string day, string courtId, string start, string duration)
+    {
+        string baseUrl = _config.BaseUrl;
+        string checkoutPath = _config.CheckoutPath;
+        return $"{baseUrl}{checkoutPath}/{clubId}?day={day}&court={courtId}&sport_id=7&duration={duration}&start={duration}";
+    }
+
     public async Task<AtcResponse> GetAvailability(string date)
     {
         var queryParams = $"?horario=19%3A30&tipoDeporte=7&dia={date}&placeId=69y7pkxfg";
-        var response = await httpClient.GetAsync(queryParams);
+        var response = await httpClient.GetAsync(_config.ListPath + queryParams);
 
         string responseBody = await response.Content.ReadAsStringAsync();
 

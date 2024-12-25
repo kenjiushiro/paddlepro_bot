@@ -35,7 +35,8 @@ public class PaddleProfile : Profile
           .ForMember(x => x.Long, opt => opt.MapFrom(x => x.Lng));
 
         CreateMap<AtcAvailableSlots, CourtAvailability>()
-          .ForMember(x => x.Price, opt => opt.MapFrom(x => x.Price.Cents / 100));
+          .ForMember(x => x.Price, opt => opt.MapFrom(x => x.Price.Cents / 100))
+          .ForMember(x => x.Start, opt => opt.MapFrom(x => DateTime.Parse(x.Start).ToString("HH:mm")));
 
         CreateMap<AtcCourt, Court>()
           .ForMember(x => x.Availability, opt => opt.Ignore());
