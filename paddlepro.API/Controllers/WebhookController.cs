@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using paddlepro.API.Services.Interfaces;
+using paddlepro.API.Services;
 
 namespace paddlepro.API.Controllers;
 
@@ -8,24 +8,21 @@ namespace paddlepro.API.Controllers;
 public class WebhookController : ControllerBase
 {
   private readonly ILogger<WebhookController> _logger;
-  private readonly IWeatherService _weatherService;
-  private readonly ITelegramService _telegramService;
+  private readonly UpdateDispatcher updateDispatcher;
 
   public WebhookController(
       ILogger<WebhookController> logger,
-      IWeatherService weatherService,
-      ITelegramService telegramService
+      UpdateDispatcher updateDispatcher
       )
   {
     _logger = logger;
-    _weatherService = weatherService;
-    _telegramService = telegramService;
+    this.updateDispatcher = updateDispatcher;
   }
 
   [HttpPost]
   public async Task<bool> Post([FromBody] Telegram.Bot.Types.Update update)
   {
     _logger.LogInformation("Received update with ID {ID} of Type {Type}", update.Id, update.Type);
-    return await _telegramService.HandleWebhook(update);
+    return await this.updateDispatcher.Dispatch(update);
   }
 }
