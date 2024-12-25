@@ -23,10 +23,9 @@ public class WebhookController : ControllerBase
   }
 
   [HttpPost]
-  // TODO secure API
   public async Task<bool> Post([FromBody] Telegram.Bot.Types.Update update)
   {
     _logger.LogInformation("Received update with ID {ID} of Type {Type}", update.Id, update.Type);
-    return await _telegramService.Respond(update);
+    return await _telegramService.HandleWebhook(update);
   }
 }
