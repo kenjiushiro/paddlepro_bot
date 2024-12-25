@@ -42,4 +42,9 @@ public static class StringHelper
     return string.Join(separator, list);
   }
 
+  public static string ToQueryParams(this Dictionary<string, string> queryParams)
+  {
+    return "?" + queryParams.Select(kv => $"{kv.Key}={kv.Value}").Join("&");
+  }
+
 }

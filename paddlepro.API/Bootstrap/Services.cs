@@ -45,7 +45,7 @@ public static class ServicesConfiguration
   {
     services.Configure<WeatherServiceConfiguration>(configuration.GetSection("WeatherService"));
     services.Configure<TelegramConfiguration>(configuration.GetSection("Telegram"));
-    services.Configure<PaddleServiceConfiguration>(configuration.GetSection("PaddleService"));
+    services.Configure<AtcServiceConfiguration>(configuration.GetSection("PaddleService"));
 
     return services;
   }

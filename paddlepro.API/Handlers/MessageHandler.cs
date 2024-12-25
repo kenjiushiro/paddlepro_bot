@@ -14,7 +14,7 @@ public class MessageHandler : IUpdateHandler
 {
   ITelegramBotClient botClient;
   ILogger<MessageHandler> logger;
-  PaddleServiceConfiguration paddleConfig;
+  AtcServiceConfiguration paddleConfig;
   TelegramConfiguration telegramConfig;
   IContextService contextService;
   IWeatherService weatherService;
@@ -25,7 +25,7 @@ public class MessageHandler : IUpdateHandler
       IWeatherService weatherService,
       IContextService contextService,
       ILogger<MessageHandler> logger,
-      IOptions<PaddleServiceConfiguration> paddleConfig,
+      IOptions<AtcServiceConfiguration> paddleConfig,
       IOptions<TelegramConfiguration> telegramConfig,
       IMapper mapper
       )

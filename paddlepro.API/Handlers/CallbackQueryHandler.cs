@@ -17,7 +17,7 @@ public class CallbackQueryHandler : IUpdateHandler
   private readonly ILogger<CallbackQueryHandler> logger;
   private readonly IContextService contextService;
   private readonly ITelegramBotClient botClient;
-  private readonly PaddleServiceConfiguration paddleConfig;
+  private readonly AtcServiceConfiguration paddleConfig;
   private readonly TelegramConfiguration telegramConfig;
   private readonly IPaddleService paddleService;
   private readonly IMapper mapper;
@@ -30,7 +30,7 @@ public class CallbackQueryHandler : IUpdateHandler
       IPaddleService paddleService,
       IContextService contextService,
       ILogger<CallbackQueryHandler> logger,
-      IOptions<PaddleServiceConfiguration> paddleConfig,
+      IOptions<AtcServiceConfiguration> paddleConfig,
       IOptions<TelegramConfiguration> telegramConfig,
       IMapper mapper
       )

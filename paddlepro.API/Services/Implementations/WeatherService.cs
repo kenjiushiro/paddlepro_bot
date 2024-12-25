@@ -30,9 +30,11 @@ public class WeatherService : IWeatherService
       {"q", city},
       {"days", this.weatherConfig.DaysInAdvance.ToString()},
       {"key", this.weatherConfig.ApiKey}
-    }.Select(kv => $"{kv.Key}={kv.Value}").Join("&");
+    };
 
-    var response = await this.httpClient.GetAsync($"/v1/forecast.json?{queryParams}");
+    var response = await this.httpClient.GetAsync($"/v1/forecast.json{queryParams.ToQueryParams()}");
+    response.EnsureSuccessStatusCode();
+
     this.logger.LogInformation("Fetching weather");
     string responseBody = await response.Content.ReadAsStringAsync();
 

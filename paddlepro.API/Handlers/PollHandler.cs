@@ -16,7 +16,7 @@ public class PollHandler : IUpdateHandler
 {
   ITelegramBotClient botClient;
   ILogger<PollHandler> logger;
-  PaddleServiceConfiguration paddleConfig;
+  AtcServiceConfiguration paddleConfig;
   IPaddleService paddleService;
   IContextService contextService;
   IMapper mapper;
@@ -26,7 +26,7 @@ public class PollHandler : IUpdateHandler
       IPaddleService paddleService,
       IContextService contextService,
       ILogger<PollHandler> logger,
-      IOptions<PaddleServiceConfiguration> paddleConfig,
+      IOptions<AtcServiceConfiguration> paddleConfig,
       IMapper mapper
       )
   {
