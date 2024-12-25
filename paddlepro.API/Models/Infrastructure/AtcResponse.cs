@@ -13,6 +13,7 @@ public class AtcPageProps
 {
   public string PlaceId { get; set; } = "";
   public string LocationName { get; set; } = "";
+
   public AtcBookingBySport[] BookingsBySport { get; set; }
 }
 
@@ -34,6 +35,8 @@ public class AtcAvailableSlots
   public short Duration { get; set; }
   public string Start { get; set; } = "";
   public AtcPrice Price { get; set; }
+
+  [JsonPropertyName("court_id")]
   public string CourtId { get; set; } = "";
 }
 
@@ -50,14 +53,15 @@ public class AtcBookingBySport
 
   public Dictionary<string, AtcCourt> Courts { get; set; }
 
-  public AtcAvailableSlots AvailableSlots { get; set; }
+  [JsonPropertyName("available_slots")]
+  public AtcAvailableSlots[] AvailableSlots { get; set; }
 }
 
 public class AtcCourt
 {
   public string Id { get; set; } = "";
 
-  [JsonPropertyName("Haslighting")]
+  [JsonPropertyName("has_lighting")]
   public bool Haslighting { get; set; }
 
   [JsonPropertyName("is_roofed")]
