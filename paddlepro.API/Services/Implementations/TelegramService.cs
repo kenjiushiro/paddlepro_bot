@@ -164,7 +164,7 @@ public class TelegramService : ITelegramService
 
         var response = await _botClient.SendMessage(
             context.ChatId,
-            text: "Reservar",
+            text: $"Reservar {start} {duration}min",
             messageThreadId: context.MessageThreadId,
             disableNotification: true,
             replyMarkup: inlineKeyboard

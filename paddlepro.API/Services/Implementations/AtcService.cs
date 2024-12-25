@@ -27,7 +27,7 @@ public class AtcService : IPaddleService
     {
         string baseUrl = _config.BaseUrl;
         string checkoutPath = _config.CheckoutPath;
-        return $"{baseUrl}{checkoutPath}/{clubId}?day={day}&court={courtId}&sport_id=7&duration={duration}&start={duration}";
+        return $"{baseUrl}{checkoutPath}/{clubId}?day={day}&court={courtId}&sport_id=7&duration={duration}&start={start}";
     }
 
     public async Task<AtcResponse> GetAvailability(string date)
