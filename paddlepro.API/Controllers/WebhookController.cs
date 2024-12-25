@@ -7,7 +7,7 @@ namespace paddlepro.API.Controllers;
 [Route("api/webhook")]
 public class WebhookController : ControllerBase
 {
-  private readonly ILogger<WebhookController> _logger;
+  private readonly ILogger<WebhookController> logger;
   private readonly UpdateDispatcher updateDispatcher;
 
   public WebhookController(
@@ -15,14 +15,14 @@ public class WebhookController : ControllerBase
       UpdateDispatcher updateDispatcher
       )
   {
-    _logger = logger;
+    this.logger = logger;
     this.updateDispatcher = updateDispatcher;
   }
 
   [HttpPost]
   public async Task<bool> Post([FromBody] Telegram.Bot.Types.Update update)
   {
-    _logger.LogInformation("Received update with ID {ID} of Type {Type}", update.Id, update.Type);
+    this.logger.LogInformation("Received update with ID {ID} of Type {Type}", update.Id, update.Type);
     return await this.updateDispatcher.Dispatch(update);
   }
 }
