@@ -9,4 +9,5 @@ public class Commands
 public class TelegramConfiguration
 {
   public Commands Commands { get; set; }
+  public bool DeleteMessages { get; set; }
 }

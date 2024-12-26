@@ -23,7 +23,6 @@ public class UpdateContextService : IUpdateContextService
     if (context != null)
     {
       context.MessageThreadId = messageThreadId;
-      context.SelectedDate = "";
       context.LastCommand = lastCommand;
     }
     else
@@ -32,7 +31,6 @@ public class UpdateContextService : IUpdateContextService
       {
         ChatId = chatId,
         MessageThreadId = messageThreadId,
-        SelectedDate = "",
         LastCommand = lastCommand,
       });
 
