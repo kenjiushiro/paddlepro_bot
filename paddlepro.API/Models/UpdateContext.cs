@@ -1,6 +1,6 @@
 namespace paddlepro.API.Models;
 
-public class Context
+public class UpdateContext
 {
     public long? ChatId { get; set; }
     public int? MessageThreadId { get; set; }
