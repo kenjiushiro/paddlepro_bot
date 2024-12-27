@@ -15,6 +15,8 @@ public static class ServicesConfiguration
         services.AddScoped<IWeatherService, WeatherService>();
         services.AddScoped<IPaddleService, AtcService>();
         services.AddScoped<ITelegramService, TelegramService>();
+        services.AddScoped<IAzureService, AzureService>();
+
         services.AddSingleton<IUpdateContextService, UpdateContextService>();
 
         services.AddSingleton<ITelegramBotClient>(sp =>
