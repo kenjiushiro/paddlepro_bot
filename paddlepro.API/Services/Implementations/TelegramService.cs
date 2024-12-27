@@ -111,8 +111,6 @@ public class TelegramService : ITelegramService
     var entities = await this.azureService.ExtractEntities(update.Message.Text!);
     this.logger.LogInformation(update.Message.Text!);
 
-    Club selectedClub;
-
     var durationEntity = entities.FirstOrDefault(entity => entity.Category == "DateTime" && entity.SubCategory == "Duration");
     var dateEntity = entities.FirstOrDefault(entity => entity.Category == "DateTime" && entity.SubCategory != "Duration");
 
