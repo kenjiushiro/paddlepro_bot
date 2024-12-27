@@ -12,4 +12,5 @@ public interface ITelegramService
   Task<bool> HandleDatePick(Update update);
   Task<bool> HandleCourtPick(Update update);
   Task<bool> HandleHourPick(Update update);
+  Task<bool> BookCourt(Update update);
 }

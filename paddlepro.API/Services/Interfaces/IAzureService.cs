@@ -1,6 +1,8 @@
+using Azure.AI.TextAnalytics;
+
 namespace paddlepro.API.Services.Interfaces;
 
 public interface IAzureService
 {
-    Task<string> ExtractEntities(string prompt);
+  Task<CategorizedEntityCollection> ExtractEntities(string prompt);
 }

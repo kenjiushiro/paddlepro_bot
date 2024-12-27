@@ -1,16 +1,44 @@
 using paddlepro.API.Services.Interfaces;
 using Azure.AI.TextAnalytics;
+using Azure;
+using Microsoft.Extensions.Options;
+using paddlepro.API.Configurations;
 
 namespace paddlepro.API.Services.Implementations;
 
 public class AzureService : IAzureService
 {
-    public AzureService()
-    {
-    }
+  private readonly AzureConfiguration azureConfig;
 
-    public Task<string> ExtractEntities(string prompt)
+  public AzureService(
+      IOptions<AzureConfiguration> azureConfig
+    )
+  {
+    this.azureConfig = azureConfig.Value;
+  }
+
+  static string languageKey = "ALnOMPnwMMJI53s817vkz1CkiyEgbbkMmdrt6JsIiF6Z9Jnz7lBNJQQJ99ALACYeBjFXJ3w3AAAaACOGfN1u";
+  static string languageEndpoint = "https://kenjilanguage.cognitiveservices.azure.com/";
+
+  private static readonly AzureKeyCredential credentials = new AzureKeyCredential(languageKey);
+  private static readonly Uri endpoint = new Uri(languageEndpoint);
+
+  // Example method for extracting named entities from text 
+  static async Task<CategorizedEntityCollection> EntityRecognitionExample(TextAnalyticsClient client, string prompt)
+  {
+    var response = await client.RecognizeEntitiesAsync(prompt);
+    Console.WriteLine("Named Entities:");
+    foreach (var entity in response.Value)
     {
-        throw new NotImplementedException();
+      Console.WriteLine($"\tText: {entity.Text},\tCategory: {entity.Category},\tSub-Category: {entity.SubCategory}");
+      Console.WriteLine($"\t\tScore: {entity.ConfidenceScore:F2},\tLength: {entity.Length},\tOffset: {entity.Offset}\n");
     }
+    return response.Value;
+  }
+
+  public async Task<CategorizedEntityCollection> ExtractEntities(string prompt)
+  {
+    var client = new TextAnalyticsClient(endpoint, credentials);
+    return await EntityRecognitionExample(client, prompt);
+  }
 }
