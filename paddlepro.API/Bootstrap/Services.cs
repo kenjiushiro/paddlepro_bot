@@ -85,7 +85,7 @@ public static class ServicesConfiguration
         case UpdateType.Poll:
           return serviceProvider.GetService<PollHandler>()!;
         default:
-          throw new KeyNotFoundException($"Handler type {key} not found");
+          return null;
       }
     });
 

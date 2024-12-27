@@ -8,6 +8,7 @@ using AutoMapper;
 using paddlepro.API.Configurations;
 using Telegram.Bot.Types;
 using Microsoft.Extensions.Options;
+using System.Text.RegularExpressions;
 
 namespace paddlepro.API.Services.Implementations;
 
@@ -47,10 +48,113 @@ public class TelegramService : ITelegramService
     this.mapper = mapper;
   }
 
+  public static DateTime ParseDate(string input)
+  {
+    var today = DateTime.Today;
+
+    DateTime GetNextDayOccurrence(DayOfWeek dayOfWeek)
+    {
+      var day = DateTime.Today.AddDays(1);
+      while (day.DayOfWeek != dayOfWeek)
+      {
+        day = day.AddDays(1);
+      }
+      return day;
+    }
+
+    Dictionary<string, DateTime> days = new Dictionary<string, DateTime> {
+      { "hoy", today },
+      { "mañana", today.AddDays(1) },
+      { "lunes", GetNextDayOccurrence(DayOfWeek.Monday) },
+      { "martes", GetNextDayOccurrence(DayOfWeek.Tuesday) },
+      { "miercoles", GetNextDayOccurrence(DayOfWeek.Wednesday) },
+      { "jueves", GetNextDayOccurrence(DayOfWeek.Thursday) },
+      { "viernes", GetNextDayOccurrence(DayOfWeek.Friday) },
+      { "sabado", GetNextDayOccurrence(DayOfWeek.Saturday) },
+      { "domingo", GetNextDayOccurrence(DayOfWeek.Sunday) },
+    };
+
+    var dayString = days.Keys.First(key => input.Contains(key));
+    var day = days[dayString];
+    if (string.IsNullOrEmpty(dayString))
+    {
+      return DateTime.Now;
+    }
+
+    string pattern = @"\b(2[0-4]|1[0-9]|0?[0-9])\b";
+    Match match = Regex.Match(input, pattern);
+
+    if (!match.Success)
+    {
+      return DateTime.Now;
+    }
+    var hour = int.Parse(match.Value);
+    if (hour < 12 && input.ToLower().Contains("pm"))
+    {
+      hour += 12;
+    }
+
+    var minutes = 0;
+    if (input.Contains("30"))
+    {
+      minutes = 30;
+    }
+
+    return day.AddHours(hour).AddMinutes(minutes);
+  }
+
   public async Task<bool> BookCourt(Update update)
   {
-    var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability("2025-01-02"));
-    var response = await this.azureService.ExtractEntities(update.Message.Text!);
+    this.contextService.SetChatContext(update);
+    var context = this.contextService.GetChatContext(update);
+
+    var entities = await this.azureService.ExtractEntities(update.Message.Text!);
+    this.logger.LogInformation(update.Message.Text!);
+
+    Club selectedClub;
+
+    var durationEntity = entities.FirstOrDefault(entity => entity.Category == "DateTime" && entity.SubCategory == "Duration");
+    var dateEntity = entities.FirstOrDefault(entity => entity.Category == "DateTime" && entity.SubCategory != "Duration");
+
+    this.logger.LogInformation("Duration entity: {Log}", durationEntity);
+    this.logger.LogInformation("Date entity: {Log}", dateEntity);
+
+    string duration = durationEntity.Text ?? "90";
+    duration = duration.ToLower().Replace("minutos", "").Trim();
+    var date = ParseDate(dateEntity.Text);
+    var day = date.ToString("yyyy-MM-dd");
+    context.SelectedDate = day;
+
+    var hour = date.ToString("HH:mm");
+
+    this.logger.LogInformation("Duration: {Log}", duration);
+    this.logger.LogInformation("Day: {Log}", day);
+    this.logger.LogInformation("Hour: {Log}", hour);
+
+    var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(day));
+
+    foreach (var entity in entities.Where(entity => entity.Category == "Location"))
+    {
+      var clubs = availability
+        .Clubs
+        .Where(club =>
+            $"{club.Name}{club.Location.Address}".ToLower().Contains(entity.Text.ToLower())
+            && club.Courts.Any(c => c.Availability.Any(a => a.Duration.ToString() == duration && a.Start == hour))
+        );
+      this.logger.LogInformation("Clubs count: {Clubs}", clubs.ToArray().Length);
+
+      foreach (var club in clubs)
+      {
+        foreach (var court in club.Courts)
+        {
+          if (court.Availability.Any(a => a.Duration.ToString() == duration && a.Start == hour))
+          {
+            await SendReservationActions(context, club.Id, court.Id, hour, duration, club.Name, court.Name);
+          }
+        }
+      }
+    }
+
     return true;
   }
 
@@ -266,14 +370,24 @@ public class TelegramService : ITelegramService
 
     (var clubId, var courtId, var start, var duration) = selection.SplitBy4("+");
 
+    return await SendReservationActions(context, clubId, courtId, start, duration);
+  }
+
+  public async Task<bool> SendReservationActions(UpdateContext context, string clubId, string courtId, string start, string duration, string clubName = "", string courtName = "")
+  {
+    string callbackValue = $"{clubId}+{courtId}+{start}+{duration}";
+
     InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup();
     var url = this.paddleService.GetCheckoutUrl(clubId, context.SelectedDate, courtId, start, duration);
     inlineKeyboard.AddNewRow(InlineKeyboardButton.WithUrl("Reservar", url));
-    inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData("Pinear mensaje", (Common.PIN_REMINDER_COMMAND, selection).EncodeCallback()));
+    inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData("Pinear mensaje", (Common.PIN_REMINDER_COMMAND, callbackValue).EncodeCallback()));
 
     var response = await this.botClient.SendMessage(
         context.ChatId,
-        text: $"Reservar {start} {duration}min {context.SelectedDate}",
+        text: @$"Reservar {start} {duration}min {context.SelectedDate} 
+{clubName}
+{courtName}
+",
         messageThreadId: context.MessageThreadId,
         disableNotification: true,
         replyMarkup: inlineKeyboard

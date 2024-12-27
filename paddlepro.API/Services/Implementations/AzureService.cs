@@ -12,7 +12,7 @@ public class AzureService : IAzureService
 
   public AzureService(
       IOptions<AzureConfiguration> azureConfig
-    )
+      )
   {
     this.azureConfig = azureConfig.Value;
   }
@@ -27,13 +27,7 @@ public class AzureService : IAzureService
   static async Task<CategorizedEntityCollection> EntityRecognitionExample(TextAnalyticsClient client, string prompt)
   {
     var response = await client.RecognizeEntitiesAsync(prompt);
-    Console.WriteLine("Named Entities:");
-    foreach (var entity in response.Value)
-    {
-      Console.WriteLine($"\tText: {entity.Text},\tCategory: {entity.Category},\tSub-Category: {entity.SubCategory}");
-      Console.WriteLine($"\t\tScore: {entity.ConfidenceScore:F2},\tLength: {entity.Length},\tOffset: {entity.Offset}\n");
-    }
-    return response.Value;
+    return response;
   }
 
   public async Task<CategorizedEntityCollection> ExtractEntities(string prompt)
