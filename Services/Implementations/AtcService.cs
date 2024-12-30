@@ -63,6 +63,9 @@ public class AtcService : IPaddleService
     response.EnsureSuccessStatusCode();
 
     string responseBody = await response.Content.ReadAsStringAsync();
+    this.logger.LogInformation("==========================================================================================");
+    this.logger.LogInformation(responseBody);
+    this.logger.LogInformation("==========================================================================================");
 
     var deserialized = JsonSerializer.Deserialize<AtcResponse>(
         responseBody,
