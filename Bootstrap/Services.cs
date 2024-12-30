@@ -25,6 +25,9 @@ public static class ServicesConfiguration
     {
       // TODO this might have a cleaner way to inject, read docu
       var botToken = configuration["BotConfiguration:BotToken"] ?? configuration["BotConfiguration_BotToken"];
+      Console.WriteLine("==========================================================================================");
+      Console.WriteLine(botToken);
+      Console.WriteLine("==========================================================================================");
       return new TelegramBotClient(token: botToken!);
     });
 
