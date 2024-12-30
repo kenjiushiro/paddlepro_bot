@@ -1,8 +1,8 @@
-﻿using paddlepro.API.Models.Infrastructure;
+﻿using paddlepro.API.Models.Application;
 
 namespace paddlepro.API.Services.Interfaces;
 
 public interface IWeatherService
 {
-  Task<ForecastDay[]> GetWeatherForecast(string city = "Buenos%20Aires");
+  Task<WeatherForecast[]> GetWeatherForecast(string city = "Buenos%20Aires");
 }

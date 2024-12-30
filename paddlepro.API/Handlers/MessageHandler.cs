@@ -30,11 +30,11 @@ public class MessageHandler : IUpdateHandler
 
     if (command.Contains(this.telegramConfig.Commands.ReadyCheck))
     {
-      return await this.telegramService.SendAvailableDates(update!);
+      return await this.telegramService.SendAvailableDates(update!, "readyCheck");
     }
     else if (command.Contains(this.telegramConfig.Commands.Search))
     {
-      return await this.telegramService.SendAvailableDates(update!);
+      return await this.telegramService.SendAvailableDates(update!, "search");
     }
     else if (command.Contains(this.telegramConfig.Commands.BookCourt))
     {

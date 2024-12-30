@@ -17,19 +17,21 @@ public static class ServicesConfiguration
     services.AddScoped<ITelegramService, TelegramService>();
     services.AddScoped<IAzureService, AzureService>();
 
-    services.AddSingleton<IUpdateContextService, UpdateContextService>();
+    services.AddMemoryCache();
+
+    services.AddScoped<IUpdateContextService, UpdateContextService>();
 
     services.AddSingleton<ITelegramBotClient>(sp =>
     {
       // TODO this might have a cleaner way to inject, read docu
       var botToken = configuration["BotConfiguration:BotToken"];
-      return new TelegramBotClient(botToken);
+      return new TelegramBotClient(botToken!);
     });
 
     services.AddHttpClient("WeatherServiceHealth", client =>
     {
       var baseUrl = configuration["WeatherService:BaseUrl"];
-      client.BaseAddress = new Uri(baseUrl);
+      client.BaseAddress = new Uri(baseUrl!);
       client.Timeout = TimeSpan.FromSeconds(5); // Shorter timeout for health checks
     });
 
@@ -37,20 +39,20 @@ public static class ServicesConfiguration
     {
       var baseUrl = configuration["PaddleService:BaseUrl"];
       client.DefaultRequestHeaders.UserAgent.ParseAdd("MyApp/1.0");
-      client.BaseAddress = new Uri(baseUrl);
+      client.BaseAddress = new Uri(baseUrl!);
     });
 
     services.AddHttpClient<IPaddleService, AtcService>(client =>
     {
       var baseUrl = configuration["PaddleService:BaseUrl"];
       client.DefaultRequestHeaders.UserAgent.ParseAdd("MyApp/1.0");
-      client.BaseAddress = new Uri(baseUrl);
+      client.BaseAddress = new Uri(baseUrl!);
     });
 
     services.AddHttpClient<IWeatherService, WeatherService>(client =>
     {
       var baseUrl = configuration["WeatherService:BaseUrl"];
-      client.BaseAddress = new Uri(baseUrl);
+      client.BaseAddress = new Uri(baseUrl!);
     });
 
     return services;

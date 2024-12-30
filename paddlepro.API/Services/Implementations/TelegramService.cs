@@ -9,6 +9,7 @@ using paddlepro.API.Configurations;
 using Telegram.Bot.Types;
 using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace paddlepro.API.Services.Implementations;
 
@@ -22,6 +23,7 @@ public class TelegramService : ITelegramService
   private readonly IWeatherService weatherService;
   private readonly IAzureService azureService;
   private readonly IUpdateContextService contextService;
+  private readonly IMemoryCache cache;
   private readonly IMapper mapper;
   private readonly List<InputPollOption> options = new List<InputPollOption> { new InputPollOption("Si"), new InputPollOption("No") };
 
@@ -33,6 +35,7 @@ public class TelegramService : ITelegramService
       IPaddleService paddleService,
       IWeatherService weatherService,
       IUpdateContextService contextService,
+      IMemoryCache cache,
       IMapper mapper,
       IAzureService azureService
     )
@@ -45,6 +48,7 @@ public class TelegramService : ITelegramService
     this.weatherService = weatherService;
     this.contextService = contextService;
     this.azureService = azureService;
+    this.cache = cache;
     this.mapper = mapper;
   }
 
@@ -105,7 +109,6 @@ public class TelegramService : ITelegramService
 
   public async Task<bool> BookCourt(Update update)
   {
-    this.contextService.SetChatContext(update);
     var context = this.contextService.GetChatContext(update);
 
     var entities = await this.azureService.ExtractEntities(update.Message.Text!);
@@ -160,7 +163,7 @@ public class TelegramService : ITelegramService
   {
     var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
     var clubs = availability.Clubs.Where(x => this.paddleConfig.ClubIds.ToList().Contains(x.Id)).ToArray();
-    context.CourtMessageIds = Array.Empty<int>();
+    context.ClearMessages(BotMessageType.DayPicker);
     foreach (var club in clubs)
     {
       if (club.Courts.All(c => c.Availability.Length == 0))
@@ -187,7 +190,7 @@ public class TelegramService : ITelegramService
           disableNotification: true,
           replyMarkup: inlineKeyboard,
           parseMode: Telegram.Bot.Types.Enums.ParseMode.MarkdownV2);
-      context.CourtMessageIds = context.CourtMessageIds.Append(response.Id).ToArray();
+      context.AddMessage(response.Id, BotMessageType.CourtMessage);
     }
     return true;
   }
@@ -206,7 +209,7 @@ public class TelegramService : ITelegramService
     if (count < this.paddleConfig.PlayerCount)
     {
       var messageText = $"Faltan {this.paddleConfig.PlayerCount - count} votos";
-      await this.botClient.EditMessageText(context.ChatId!, context.CountMessageId, messageText);
+      await this.botClient.EditMessageText(context.ChatId!, context.GetMessages(BotMessageType.CountMessage).First(), messageText);
       return true;
     }
     else
@@ -237,21 +240,24 @@ public class TelegramService : ITelegramService
 {club.Courts.Select(c => GetCourtMessage(c)).Join("\n")}||";
   }
 
-  public async Task<bool> SendAvailableDates(Update update)
+  private async Task DeleteMessages(UpdateContext context, BotMessageType type)
   {
-    this.contextService.SetChatContext(update);
-    var chatId = update?.Message?.Chat.Id;
-    var threadId = update?.Message?.MessageThreadId;
-    var command = update?.Message?.Text ?? "";
-    var dateRange = DateTime.Today.AddDays(this.paddleConfig.DaysInAdvance);
-    var forecast = this.mapper.Map<WeatherForecast[]>(await this.weatherService.GetWeatherForecast());
-
-    var context = this.contextService.GetChatContext(update!);
-    if (context.LatestDayPicker != default)
+    var messageToDelete = context.GetMessages(type);
+    if (this.telegramConfig.DeleteMessages && messageToDelete.Length > 0)
     {
-      await this.botClient.DeleteMessage(context.ChatId, context.LatestDayPicker);
-      context.LatestDayPicker = default;
+      await this.botClient.DeleteMessages(context.ChatId, messageToDelete);
+      context.ClearMessages(type);
     }
+  }
+
+  public async Task<bool> SendAvailableDates(Update update, string nextStep)
+  {
+    var context = this.contextService.GetChatContext(update);
+    context.NextStep = nextStep;
+    var dateRange = DateTime.Today.AddDays(this.paddleConfig.DaysInAdvance);
+    var forecast = await this.weatherService.GetWeatherForecast();
+
+    await this.DeleteMessages(context, BotMessageType.DayPicker);
 
     var inlineKeyboard = new InlineKeyboardMarkup();
 
@@ -268,11 +274,11 @@ public class TelegramService : ITelegramService
       buttonDisplay = $"{buttonDisplay} {dayForecast?.Emoji} {dayForecast?.MinTemp}°C-{dayForecast?.MaxTemp}°C {rainEmoji} {dayForecast?.ChanceOfRain}%";
       inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(buttonDisplay, (Common.PICK_DATE_COMMAND, buttonValue).EncodeCallback()));
     }
-    this.logger.LogInformation("ChatId: {ChatId}", chatId);
+    this.logger.LogInformation("ChatId: {ChatId}", context.ChatId);
     this.logger.LogInformation("Context: {Context}", context);
 
-    var message = await this.botClient.SendMessage(chatId, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);
-    context.LatestDayPicker = message.MessageId;
+    var message = await this.botClient.SendMessage(context.ChatId, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);
+    context.AddMessage(message.MessageId, BotMessageType.DayPicker);
     return true;
   }
 
@@ -295,26 +301,13 @@ public class TelegramService : ITelegramService
 
     var context = this.contextService.GetChatContext(update);
     context.SelectedDate = matchDate;
-    if (context.LatestDayPicker > 0)
-    {
-      if (this.telegramConfig.DeleteMessages)
-      {
-        await this.botClient.DeleteMessage(context.ChatId, context.LatestDayPicker);
-      }
-      context.LatestDayPicker = 0;
-    }
+    await this.DeleteMessages(context, BotMessageType.DayPicker);
   }
 
   private async Task<bool> StartReadyCheckPoll(UpdateContext context)
   {
-    if (context.LatestPollId > 0)
-    {
-      await this.botClient.DeleteMessage(context.ChatId, context.LatestPollId);
-      context.LatestPollId = 0;
-    }
-
     var poll = await this.botClient.SendPoll(context.ChatId, $"Estas para jugar el {context.SelectedDate}?", options, isAnonymous: false, messageThreadId: context.MessageThreadId, disableNotification: true);
-    context.LatestPollId = poll.MessageId;
+    context.AddMessage(poll.MessageId, BotMessageType.ReadyCheckPoll);
     Common.pollChatIdDict.Add(poll.Poll.Id, context.ChatId);
     await SendPlayerCountMessage(context);
     return true;
@@ -323,14 +316,15 @@ public class TelegramService : ITelegramService
   private async Task SendPlayerCountMessage(UpdateContext context, string messageText = "Faltan 4 votos")
   {
     var countMessage = await this.botClient.SendMessage(context.ChatId, messageText, messageThreadId: context.MessageThreadId, disableNotification: true);
-    context.CountMessageId = countMessage.MessageId;
+    context.AddMessage(countMessage.MessageId, BotMessageType.CountMessage);
   }
 
   public async Task<bool> HandleCourtPick(Update update)
   {
     var context = this.contextService.GetChatContext(update);
-    await this.botClient.DeleteMessages(context.ChatId, context.CourtMessageIds);
-    context.CourtMessageIds = Array.Empty<int>();
+
+    await this.DeleteMessages(context, BotMessageType.CourtMessage);
+
     (var _, var selection) = (update?.CallbackQuery?.Data).DecodeCallback();
     var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
     (var clubId, var courtId) = selection.SplitBy(":");
@@ -355,15 +349,15 @@ public class TelegramService : ITelegramService
         disableNotification: true,
         replyMarkup: inlineKeyboard
         );
-    context.HourPickerId = response.Id;
+    context.AddMessage(response.Id, BotMessageType.HourPicker);
     return true;
   }
 
   public async Task<bool> HandleHourPick(Update update)
   {
     var context = this.contextService.GetChatContext(update);
-    await this.botClient.DeleteMessage(context.ChatId, context.HourPickerId);
-    context.HourPickerId = default;
+    await this.DeleteMessages(context, BotMessageType.HourPicker);
+
     (var _, var selection) = (update?.CallbackQuery?.Data).DecodeCallback();
 
     (var clubId, var courtId, var start, var duration) = selection.SplitBy4("+");
@@ -396,13 +390,17 @@ public class TelegramService : ITelegramService
   public async Task<bool> HandleDatePick(Update update)
   {
     var context = this.contextService.GetChatContext(update);
+    await this.DeleteMessages(context, BotMessageType.DayPicker);
+
     (var _, var selection) = (update?.CallbackQuery?.Data).DecodeCallback();
     await OnDateSelected(update, selection);
-    if (context.LastCommand.Contains(this.telegramConfig.Commands.ReadyCheck))
+    this.logger.LogInformation("Selected date: {SelectedDate} Next step: {NextStep}", selection, context.NextStep);
+
+    if (context.NextStep == "readyCheck")
     {
       return await StartReadyCheckPoll(context);
     }
-    else if (context.LastCommand.Contains(this.telegramConfig.Commands.Search))
+    else if (context.NextStep == "search")
     {
       return await SendAvailability(context);
     }

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using paddlepro.API.Models;
 using paddlepro.API.Services.Interfaces;
 using Telegram.Bot.Types;
@@ -7,34 +8,29 @@ namespace paddlepro.API.Services.Implementations;
 
 public class UpdateContextService : IUpdateContextService
 {
-  private readonly List<UpdateContext> contexts;
-  public UpdateContextService()
+  private readonly IMemoryCache cache;
+
+  public UpdateContextService(
+      IMemoryCache cache
+      )
   {
-    this.contexts = new List<UpdateContext>();
+    this.cache = cache;
   }
 
-  public void SetChatContext(Update update)
+  private UpdateContext SetChatContext(Update update)
   {
-    var chatId = update?.Message?.Chat.Id;
-    var messageThreadId = update?.Message?.MessageThreadId;
+    var chatId = update?.Message?.Chat.Id!;
+    var messageThreadId = update?.Message?.MessageThreadId!;
     var lastCommand = update?.Message?.Text ?? "";
 
-    var context = GetChatContext(update);
-    if (context != null)
+    var context = new UpdateContext
     {
-      context.MessageThreadId = messageThreadId;
-      context.LastCommand = lastCommand;
-    }
-    else
-    {
-      this.contexts.Add(new UpdateContext
-      {
-        ChatId = chatId,
-        MessageThreadId = messageThreadId,
-        LastCommand = lastCommand,
-      });
-
-    }
+      ChatId = chatId,
+      MessageThreadId = messageThreadId,
+      NextStep = lastCommand,
+    };
+    this.cache.Set(chatId, context);
+    return context;
   }
 
   public long? GetChatId(Update update)
@@ -46,15 +42,16 @@ public class UpdateContextService : IUpdateContextService
       case UpdateType.CallbackQuery:
         return update?.CallbackQuery?.Message?.Chat?.Id;
       case UpdateType.Poll:
-        return Common.pollChatIdDict[update?.Poll?.Id];
+        return Common.pollChatIdDict[update?.Poll?.Id!];
       default:
-        throw new Exception("TBD");
+        throw new Exception($"Can't get an ID from an update type {update.Type}");
     }
   }
 
   public UpdateContext GetChatContext(Update update)
   {
     var chatId = GetChatId(update);
-    return this.contexts.FirstOrDefault(c => c.ChatId == chatId);
+    var context = this.cache.Get<UpdateContext>(chatId);
+    return context ?? SetChatContext(update);
   }
 }
