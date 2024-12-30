@@ -9,21 +9,17 @@ namespace paddlepro.API.Services.Implementations;
 public class AzureService : IAzureService
 {
   private readonly AzureConfiguration azureConfig;
+  private readonly ILogger<AzureService> logger;
 
   public AzureService(
-      IOptions<AzureConfiguration> azureConfig
+      IOptions<AzureConfiguration> azureConfig,
+      ILogger<AzureService> logger
       )
   {
     this.azureConfig = azureConfig.Value;
+    this.logger = logger;
   }
 
-  static string languageKey = "ALnOMPnwMMJI53s817vkz1CkiyEgbbkMmdrt6JsIiF6Z9Jnz7lBNJQQJ99ALACYeBjFXJ3w3AAAaACOGfN1u";
-  static string languageEndpoint = "https://kenjilanguage.cognitiveservices.azure.com/";
-
-  private static readonly AzureKeyCredential credentials = new AzureKeyCredential(languageKey);
-  private static readonly Uri endpoint = new Uri(languageEndpoint);
-
-  // Example method for extracting named entities from text 
   static async Task<CategorizedEntityCollection> EntityRecognitionExample(TextAnalyticsClient client, string prompt)
   {
     var response = await client.RecognizeEntitiesAsync(prompt);
@@ -32,6 +28,8 @@ public class AzureService : IAzureService
 
   public async Task<CategorizedEntityCollection> ExtractEntities(string prompt)
   {
+    AzureKeyCredential credentials = new AzureKeyCredential(this.azureConfig.TextAnalytics.Key);
+    Uri endpoint = new Uri(this.azureConfig.TextAnalytics.Endpoint);
     var client = new TextAnalyticsClient(endpoint, credentials);
     return await EntityRecognitionExample(client, prompt);
   }
