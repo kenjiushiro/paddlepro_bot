@@ -24,8 +24,8 @@ public static class ServicesConfiguration
     services.AddSingleton<ITelegramBotClient>(sp =>
     {
       // TODO this might have a cleaner way to inject, read docu
-      var botToken = configuration["BotConfiguration:BotToken"];
-      return new TelegramBotClient(botToken!);
+      var botToken = configuration["BotConfiguration:BotToken"] ?? configuration["BotConfiguration_BotToken"];
+      return new TelegramBotClient(token: botToken!);
     });
 
     services.AddHttpClient("WeatherServiceHealth", client =>
