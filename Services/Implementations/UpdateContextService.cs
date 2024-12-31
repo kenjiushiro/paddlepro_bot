@@ -9,12 +9,15 @@ namespace paddlepro.API.Services.Implementations;
 public class UpdateContextService : IUpdateContextService
 {
   private readonly IMemoryCache cache;
+  private readonly ILogger<UpdateContextService> logger;
 
   public UpdateContextService(
-      IMemoryCache cache
+      IMemoryCache cache,
+      ILogger<UpdateContextService> logger
       )
   {
     this.cache = cache;
+    this.logger = logger;
   }
 
   private UpdateContext SetChatContext(Update update)
@@ -51,7 +54,7 @@ public class UpdateContextService : IUpdateContextService
   public UpdateContext GetChatContext(Update update)
   {
     var chatId = GetChatId(update);
-    var context = this.cache.Get<UpdateContext>(chatId);
+    var context = this.cache.Get<UpdateContext>(chatId!);
     return context ?? SetChatContext(update);
   }
 }

@@ -111,8 +111,8 @@ public class TelegramService : ITelegramService
   {
     var context = this.contextService.GetChatContext(update);
 
-    var entities = await this.azureService.ExtractEntities(update.Message.Text!);
-    this.logger.LogInformation(update.Message.Text!);
+    var entities = await this.azureService.ExtractEntities(update.Message?.Text!);
+    this.logger.LogInformation(update.Message?.Text!);
 
     var durationEntity = entities.FirstOrDefault(entity => entity.Category == "DateTime" && entity.SubCategory == "Duration");
     var dateEntity = entities.FirstOrDefault(entity => entity.Category == "DateTime" && entity.SubCategory != "Duration");
@@ -245,7 +245,7 @@ public class TelegramService : ITelegramService
     var messageToDelete = context.GetMessages(type);
     if (this.telegramConfig.DeleteMessages && messageToDelete.Length > 0)
     {
-      await this.botClient.DeleteMessages(context.ChatId, messageToDelete);
+      await this.botClient.DeleteMessages(context.ChatId!, messageToDelete);
       context.ClearMessages(type);
     }
   }
@@ -277,7 +277,7 @@ public class TelegramService : ITelegramService
     this.logger.LogInformation("ChatId: {ChatId}", context.ChatId);
     this.logger.LogInformation("Context: {Context}", context);
 
-    var message = await this.botClient.SendMessage(context.ChatId, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);
+    var message = await this.botClient.SendMessage(context.ChatId!, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);
     context.AddMessage(message.MessageId, BotMessageType.DayPicker);
     return true;
   }
@@ -291,31 +291,31 @@ public class TelegramService : ITelegramService
 
     if (chatId == null)
     {
-      this.logger.LogWarning("Chat ID null for update {Id} on ReadyCheckPoll step", update.Id);
+      this.logger.LogWarning("Chat ID null for update {Id} on ReadyCheckPoll step", update?.Id);
     }
 
     if (matchDate == null)
     {
-      this.logger.LogWarning("Match Date returned null from Update Id {Id}", update.Id);
+      this.logger.LogWarning("Match Date returned null from Update Id {Id}", update?.Id);
     }
 
-    var context = this.contextService.GetChatContext(update);
-    context.SelectedDate = matchDate;
+    var context = this.contextService.GetChatContext(update!);
+    context.SelectedDate = matchDate!;
     await this.DeleteMessages(context, BotMessageType.DayPicker);
   }
 
   private async Task<bool> StartReadyCheckPoll(UpdateContext context)
   {
-    var poll = await this.botClient.SendPoll(context.ChatId, $"Estas para jugar el {context.SelectedDate}?", options, isAnonymous: false, messageThreadId: context.MessageThreadId, disableNotification: true);
-    context.AddMessage(poll.MessageId, BotMessageType.ReadyCheckPoll);
-    Common.pollChatIdDict.Add(poll.Poll.Id, context.ChatId);
-    await SendPlayerCountMessage(context);
+    var poll = await this.botClient.SendPoll(context?.ChatId!, $"Estas para jugar el {context?.SelectedDate}?", options, isAnonymous: false, messageThreadId: context?.MessageThreadId, disableNotification: true);
+    context?.AddMessage(poll.MessageId, BotMessageType.ReadyCheckPoll);
+    Common.pollChatIdDict.Add(poll.Poll?.Id!, context?.ChatId);
+    await SendPlayerCountMessage(context!);
     return true;
   }
 
   private async Task SendPlayerCountMessage(UpdateContext context, string messageText = "Faltan 4 votos")
   {
-    var countMessage = await this.botClient.SendMessage(context.ChatId, messageText, messageThreadId: context.MessageThreadId, disableNotification: true);
+    var countMessage = await this.botClient.SendMessage(context.ChatId!, messageText, messageThreadId: context.MessageThreadId, disableNotification: true);
     context.AddMessage(countMessage.MessageId, BotMessageType.CountMessage);
   }
 
@@ -325,13 +325,13 @@ public class TelegramService : ITelegramService
 
     await this.DeleteMessages(context, BotMessageType.CourtMessage);
 
-    (var _, var selection) = (update?.CallbackQuery?.Data).DecodeCallback();
+    (var _, var selection) = (update?.CallbackQuery?.Data!).DecodeCallback();
     var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
     (var clubId, var courtId) = selection.SplitBy(":");
     var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
-    var court = club.Courts.FirstOrDefault(c => c.Id == courtId);
+    var court = club?.Courts.FirstOrDefault(c => c.Id == courtId);
 
-    var buttons = court.Availability.Select(
+    var buttons = court?.Availability.Select(
         a =>
         {
           var value = $"{clubId}+{courtId}+{a.Start}+{a.Duration}";
@@ -341,10 +341,10 @@ public class TelegramService : ITelegramService
           };
         }).ToArray();
 
-    InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons);
+    InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons!);
     var response = await this.botClient.SendMessage(
-        context.ChatId,
-        $"Reservar {club.Name} {court.Name} {context.SelectedDate}",
+        context.ChatId!,
+        $"Reservar {club?.Name} {court?.Name} {context.SelectedDate}",
         messageThreadId: context.MessageThreadId,
         disableNotification: true,
         replyMarkup: inlineKeyboard
@@ -358,7 +358,7 @@ public class TelegramService : ITelegramService
     var context = this.contextService.GetChatContext(update);
     await this.DeleteMessages(context, BotMessageType.HourPicker);
 
-    (var _, var selection) = (update?.CallbackQuery?.Data).DecodeCallback();
+    (var _, var selection) = (update?.CallbackQuery?.Data!).DecodeCallback();
 
     (var clubId, var courtId, var start, var duration) = selection.SplitBy4("+");
 
@@ -375,7 +375,7 @@ public class TelegramService : ITelegramService
     inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData("Pinear mensaje", (Common.PIN_REMINDER_COMMAND, callbackValue).EncodeCallback()));
 
     var response = await this.botClient.SendMessage(
-        context.ChatId,
+        context.ChatId!,
         text: @$"Reservar {start} {duration}min {context.SelectedDate} 
 {clubName}
 {courtName}
@@ -392,8 +392,8 @@ public class TelegramService : ITelegramService
     var context = this.contextService.GetChatContext(update);
     await this.DeleteMessages(context, BotMessageType.DayPicker);
 
-    (var _, var selection) = (update?.CallbackQuery?.Data).DecodeCallback();
-    await OnDateSelected(update, selection);
+    (var _, var selection) = (update?.CallbackQuery?.Data!).DecodeCallback();
+    await OnDateSelected(update!, selection);
     this.logger.LogInformation("Selected date: {SelectedDate} Next step: {NextStep}", selection, context.NextStep);
 
     if (context.NextStep == "readyCheck")
@@ -410,24 +410,24 @@ public class TelegramService : ITelegramService
   public async Task<bool> SendPinnedMatchReminderMessage(Update update)
   {
     var context = this.contextService.GetChatContext(update);
-    (var _, var selection) = (update?.CallbackQuery?.Data).DecodeCallback();
+    (var _, var selection) = (update?.CallbackQuery?.Data!).DecodeCallback();
 
     (var clubId, var courtId, var start, var duration) = selection.SplitBy4("+");
     var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
     var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
-    var court = club.Courts.FirstOrDefault(c => c.Id == courtId);
+    var court = club?.Courts.FirstOrDefault(c => c.Id == courtId);
 
     var message = @$"Detalles del partido:
-🏟️ {club.Name} - 📍 {club.Location.Address} - {context.SelectedDate}
-{court.Name} - {start} {duration}min
+🏟️ {club?.Name} - 📍 {club?.Location.Address} - {context.SelectedDate}
+{court?.Name} - {start} {duration}min
         ";
 
     var response = await this.botClient.SendMessage(
-        context.ChatId,
+        context.ChatId!,
         message,
         messageThreadId: context.MessageThreadId,
         disableNotification: true);
-    await this.botClient.PinChatMessage(context.ChatId, response.MessageId, disableNotification: true);
+    await this.botClient.PinChatMessage(context.ChatId!, response.MessageId, disableNotification: true);
     return true;
   }
 }

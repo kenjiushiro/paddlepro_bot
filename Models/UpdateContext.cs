@@ -2,11 +2,11 @@ namespace paddlepro.API.Models;
 
 public enum BotMessageType
 {
-  ReadyCheckPoll,
   DayPicker,
-  HourPicker,
+  ReadyCheckPoll,
   CountMessage,
   CourtMessage,
+  HourPicker,
 }
 
 public class BotMessage
@@ -34,11 +34,11 @@ public class UpdateContext
 
   public void AddMessage(int MessageId, BotMessageType type)
   {
-    this.Messages.Append(new BotMessage
+    this.Messages = this.Messages.Append(new BotMessage
     {
       Id = MessageId,
       Type = type,
-    });
+    }).ToArray();
   }
 
   public long? ChatId { get; set; }

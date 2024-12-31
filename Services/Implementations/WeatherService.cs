@@ -53,7 +53,7 @@ public class WeatherService : IWeatherService
         new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
     );
 
-    return this.mapper.Map<WeatherForecast[]>(weatherResponse.Forecast.Forecastday);
+    return this.mapper.Map<WeatherForecast[]>(weatherResponse?.Forecast.Forecastday);
   }
 
   public async Task<WeatherForecast[]> GetWeatherForecast(string city = "Buenos%20Aires")
@@ -70,6 +70,6 @@ public class WeatherService : IWeatherService
             AbsoluteExpirationRelativeToNow = expiration
           });
     }
-    return forecast;
+    return forecast!;
   }
 }
