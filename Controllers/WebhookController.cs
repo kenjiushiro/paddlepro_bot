@@ -23,6 +23,13 @@ public class WebhookController : ControllerBase
   public async Task<bool> Webhook([FromBody] Telegram.Bot.Types.Update update)
   {
     this.logger.LogInformation("Received update with ID {ID} of Type {Type}", update.Id, update.Type);
-    return await this.updateDispatcher.Dispatch(update);
+    try
+    {
+      return await this.updateDispatcher.Dispatch(update);
+    }
+    catch
+    {
+      return false;
+    }
   }
 }
