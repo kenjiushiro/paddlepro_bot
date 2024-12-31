@@ -5,7 +5,7 @@ namespace paddlepro.API.Services.Interfaces;
 
 public interface ITelegramService
 {
-  Task<bool> SendAvailability(UpdateContext context);
+  Task<bool> SendAvailableClubs(UpdateContext context);
   Task<bool> HandleReadyCheckVote(Update update);
   Task<bool> SendAvailableDates(Update update, string nextStep);
   Task<bool> SendPinnedMatchReminderMessage(Update update);

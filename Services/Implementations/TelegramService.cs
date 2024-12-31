@@ -159,7 +159,7 @@ public class TelegramService : ITelegramService
     return true;
   }
 
-  public async Task<bool> SendAvailability(UpdateContext context)
+  public async Task<bool> SendAvailableClubs(UpdateContext context)
   {
     var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
     var clubs = availability.Clubs.Where(x => this.paddleConfig.ClubIds.ToList().Contains(x.Id) && x.IsAvailable).ToArray();
@@ -205,15 +205,15 @@ public class TelegramService : ITelegramService
     }
     else
     {
-      await this.SendAvailability(context);
+      await this.SendAvailableClubs(context);
       return true;
     }
   }
 
   private string GetAvailabilityMessage(Models.Application.Court court)
   {
-    return court.Availability.Select(a => @$"
->{a.Start} - {a.Duration}min - ${a.Price}").Join("");
+    return court.Availability.GroupBy(a => a.Start).Select(a => @$"
+>{a.Key} - {a.Select(b => b.Duration + "min").Join(" - ")}").Join("");
   }
 
   private string GetCourtMessage(Models.Application.Court court)
@@ -341,13 +341,17 @@ public class TelegramService : ITelegramService
           };
         }).ToArray();
 
+    var message = @$"Reservar 📅*{context.SelectedDate}*
+🏟️{club?.Name}
+🎾{court?.Name} ";
     InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons!);
     var response = await this.botClient.SendMessage(
         context.ChatId!,
-        $"Reservar {club?.Name} {court?.Name} {context.SelectedDate}",
+        message.EscapeCharsForMarkdown(),
         messageThreadId: context.MessageThreadId,
         disableNotification: true,
-        replyMarkup: inlineKeyboard
+        replyMarkup: inlineKeyboard,
+        parseMode: Telegram.Bot.Types.Enums.ParseMode.MarkdownV2
         );
     context.AddMessage(response.Id, BotMessageType.HourPicker);
     return true;
@@ -410,8 +414,8 @@ public class TelegramService : ITelegramService
 
     InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup();
     var url = this.paddleService.GetCheckoutUrl(clubId, context.SelectedDate, courtId, start, duration);
-    inlineKeyboard.AddNewRow(InlineKeyboardButton.WithUrl("Reservar", url));
-    inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData("Pinear mensaje", (Common.PIN_REMINDER_COMMAND, callbackValue).EncodeCallback()));
+    inlineKeyboard.AddNewRow(InlineKeyboardButton.WithUrl("📅Reservar", url));
+    inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData("📍Pinear mensaje", (Common.PIN_REMINDER_COMMAND, callbackValue).EncodeCallback()));
 
     var response = await this.botClient.SendMessage(
         context.ChatId!,
@@ -441,7 +445,7 @@ public class TelegramService : ITelegramService
     }
     else if (context.NextStep == "search")
     {
-      return await SendAvailability(context);
+      return await SendAvailableClubs(context);
     }
     return false;
   }
