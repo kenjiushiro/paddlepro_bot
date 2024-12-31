@@ -4,15 +4,16 @@ using paddlepro.API.Bootstrap;
 using System.Text.Json;
 using paddlepro.API.HealthCheck;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using paddlepro.API.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
-  options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-  options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
-  options.JsonSerializerOptions.WriteIndented = true;
+    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+    options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
+    options.JsonSerializerOptions.WriteIndented = true;
 });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -36,12 +37,13 @@ var app = builder.Build();
 /*app.UseHttpsRedirection();*/
 
 app.UseAuthorization();
+app.UseMiddleware<ApiKeyValidationMiddleware>();
 
 app.MapControllers();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
-  ResponseWriter = HealthCheckWriter.ResponseWriter
+    ResponseWriter = HealthCheckWriter.ResponseWriter
 });
 
 app.Run();
