@@ -1,36 +1,41 @@
+using Microsoft.Extensions.Options;
+using paddlepro.API.Configurations;
+
 namespace paddlepro.API.Middlewares;
 
 public class ApiKeyValidationMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly string _expectedApiKey;
+  private readonly RequestDelegate next;
+  private readonly ILogger<ApiKeyValidationMiddleware> logger;
+  private readonly string expectedApiKey;
 
-    public ApiKeyValidationMiddleware(RequestDelegate next, IConfiguration configuration)
+  public ApiKeyValidationMiddleware(RequestDelegate next, IOptions<TelegramConfiguration> config, ILogger<ApiKeyValidationMiddleware> logger)
+  {
+    this.next = next;
+    this.logger = logger;
+    this.expectedApiKey = config.Value.ApiKey;
+  }
+
+  public async Task InvokeAsync(HttpContext context)
+  {
+    if (!context.Request.Headers.TryGetValue("X-Telegram-Bot-Api-Secret-Token", out var providedApiKey))
     {
-        _next = next;
-        // Retrieve the expected API key from configuration
-        _expectedApiKey = configuration["Telegram:ApiKey"];
+      this.logger.LogWarning("Missing API Key");
+      context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+      await context.Response.WriteAsync("API Key is missing.");
+      return;
     }
 
-    public async Task InvokeAsync(HttpContext context)
+    // Compare the provided key with the expected key
+    if (!this.expectedApiKey.Equals(providedApiKey))
     {
-        // Check if the header is present
-        if (!context.Request.Headers.TryGetValue("X-Telegram-Bot-Api-Secret-Token", out var providedApiKey))
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsync("API Key is missing.");
-            return;
-        }
-
-        // Compare the provided key with the expected key
-        if (!_expectedApiKey.Equals(providedApiKey))
-        {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            await context.Response.WriteAsync("Invalid API Key.");
-            return;
-        }
-
-        // Continue to the next middleware or action
-        await _next(context);
+      this.logger.LogWarning("Invalid API Key");
+      context.Response.StatusCode = StatusCodes.Status403Forbidden;
+      await context.Response.WriteAsync("Invalid API Key.");
+      return;
     }
+
+    // Continue to the next middleware or action
+    await this.next(context);
+  }
 }

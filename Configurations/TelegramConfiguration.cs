@@ -11,5 +11,5 @@ public class TelegramConfiguration
 {
   public Commands Commands { get; set; }
   public bool DeleteMessages { get; set; }
-  public string SecretKey { get; set; }
+  public string ApiKey { get; set; } = "";
 }

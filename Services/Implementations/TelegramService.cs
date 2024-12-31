@@ -165,7 +165,6 @@ public class TelegramService : ITelegramService
   {
     var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
     var clubs = availability.Clubs.Where(x => this.paddleConfig.ClubIds.ToList().Contains(x.Id) && x.IsAvailable).ToArray();
-    context.ClearMessages(BotMessageType.DayPicker);
 
     var (message, inlineKeyboard) = this.messageFormatter.FormatClubsAvailabilityMessage(clubs, context.SelectedDate);
 
@@ -207,11 +206,11 @@ public class TelegramService : ITelegramService
 
   private async Task DeleteMessages(UpdateContext context, BotMessageType type)
   {
-    var messageToDelete = context.GetMessages(type);
-    if (this.telegramConfig.DeleteMessages && messageToDelete.Length > 0)
+    if (this.telegramConfig.DeleteMessages && context.Messages.Any())
     {
+      var messageToDelete = context.Messages.Select(m => m.Id);
       await this.botClient.DeleteMessages(context.ChatId!, messageToDelete);
-      context.ClearMessages(type);
+      context.ClearMessages();
     }
   }
 
@@ -363,7 +362,7 @@ public class TelegramService : ITelegramService
     return false;
   }
 
-  public async Task<bool> SendPinnedMatchReminderMessage(Update update, string callbackData)
+  public async Task<bool> HandlerPinReminderPick(Update update, string callbackData)
   {
     var context = this.contextService.GetChatContext(update);
 

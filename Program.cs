@@ -11,15 +11,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
-    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-    options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
-    options.JsonSerializerOptions.WriteIndented = true;
+  options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+  options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
+  options.JsonSerializerOptions.WriteIndented = true;
 });
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Configuration.AddEnvironmentVariables();
+builder.Configuration.AddUserSecrets<Program>();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 builder.Services.AddHealthChecks()
     .AddCheck<AtcHealthCheck>("AtcHealthCheck")
     .AddCheck<WeatherServiceHealthCheck>("WeatherServiceHealthCheck")
@@ -30,6 +29,7 @@ builder.Services.AddAutoMapper(typeof(WeatherProfile));
 builder.Services.AddServices(builder.Configuration);
 builder.Services.AddConfiguration(builder.Configuration);
 builder.Services.AddHandlers();
+
 
 var app = builder.Build();
 
@@ -43,7 +43,7 @@ app.MapControllers();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
-    ResponseWriter = HealthCheckWriter.ResponseWriter
+  ResponseWriter = HealthCheckWriter.ResponseWriter
 });
 
 app.Run();

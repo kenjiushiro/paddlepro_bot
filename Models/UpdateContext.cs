@@ -23,9 +23,9 @@ public class UpdateContext
     this.Messages = new BotMessage[] { };
   }
 
-  public void ClearMessages(BotMessageType type)
+  public void ClearMessages()
   {
-    this.Messages = this.Messages.Where(m => m.Type == type).ToArray();
+    this.Messages = Array.Empty<BotMessage>();
   }
 
   public int[] GetMessages(BotMessageType type)

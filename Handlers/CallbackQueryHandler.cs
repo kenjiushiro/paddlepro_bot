@@ -27,7 +27,7 @@ public class CallbackQueryHandler : IUpdateHandler
           { Common.PICK_CLUB_COMMAND, this.telegramService.HandleClubPick },
           { Common.PICK_COURT_COMMAND, this.telegramService.HandleCourtPick },
           { Common.PICK_HOUR_COMMAND, this.telegramService.HandleHourPick },
-          { Common.PIN_REMINDER_COMMAND, this.telegramService.SendPinnedMatchReminderMessage },
+          { Common.PIN_REMINDER_COMMAND, this.telegramService.HandlerPinReminderPick },
         };
     (var action, string callbackData) = (update?.CallbackQuery?.Data!).DecodeCallback();
 
