@@ -199,7 +199,8 @@ public class TelegramService : ITelegramService
 
     if (count < this.paddleConfig.PlayerCount)
     {
-      var messageText = $"Faltan {this.paddleConfig.PlayerCount - count} votos";
+      var votosFaltantes = this.paddleConfig.PlayerCount - count;
+      var messageText = votosFaltantes == 1 ? "Falta 1 voto" : $"Faltan {votosFaltantes} votos";
       await this.botClient.EditMessageText(context.ChatId!, context.GetMessages(BotMessageType.CountMessage).First(), messageText);
       return true;
     }
@@ -275,6 +276,7 @@ public class TelegramService : ITelegramService
       inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(buttonDisplay, (Common.PICK_DATE_COMMAND, buttonValue).EncodeCallback()));
     }
     this.logger.LogInformation("ChatId: {ChatId}", context.ChatId);
+    this.logger.LogInformation("ThreadId: {ThreadId}", context.MessageThreadId);
     this.logger.LogInformation("Context: {Context}", context);
 
     var message = await this.botClient.SendMessage(context.ChatId!, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);
@@ -473,7 +475,8 @@ public class TelegramService : ITelegramService
         message.EscapeCharsForMarkdown(),
         messageThreadId: context.MessageThreadId,
         disableNotification: true,
-        parseMode: Telegram.Bot.Types.Enums.ParseMode.MarkdownV2);
+        parseMode: Telegram.Bot.Types.Enums.ParseMode.MarkdownV2
+        );
     await this.botClient.PinChatMessage(context.ChatId!, response.MessageId, disableNotification: true);
     return true;
   }
