@@ -7,17 +7,17 @@ namespace paddlepro.API.Handlers;
 
 public class CallbackQueryHandler : IUpdateHandler
 {
-  private readonly ILogger<CallbackQueryHandler> logger;
-  private readonly ITelegramService telegramService;
+    private readonly ILogger<CallbackQueryHandler> logger;
+    private readonly ITelegramService telegramService;
 
-  public CallbackQueryHandler(
-      ILogger<CallbackQueryHandler> logger,
-      ITelegramService telegramService
-      )
-  {
-    this.logger = logger;
-    this.telegramService = telegramService;
-  }
+    public CallbackQueryHandler(
+        ILogger<CallbackQueryHandler> logger,
+        ITelegramService telegramService
+        )
+    {
+        this.logger = logger;
+        this.telegramService = telegramService;
+    }
 
   public async Task<bool> Handle(Update update)
   {

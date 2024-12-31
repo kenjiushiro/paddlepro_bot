@@ -60,15 +60,33 @@ public class TelegramService : ITelegramService
 
     DateTime GetNextDayOccurrence(DayOfWeek dayOfWeek)
     {
-      var day = DateTime.Today.AddDays(1);
-      while (day.DayOfWeek != dayOfWeek)
-      {
-        day = day.AddDays(1);
-      }
-      return day;
+        this.botClient = botClient;
+        this.logger = logger;
+        this.paddleConfig = paddleConfig.Value;
+        this.telegramConfig = telegramConfig.Value;
+        this.paddleService = paddleService;
+        this.weatherService = weatherService;
+        this.contextService = contextService;
+        this.azureService = azureService;
+        this.cache = cache;
+        this.mapper = mapper;
     }
 
-    Dictionary<string, DateTime> days = new Dictionary<string, DateTime> {
+    public static DateTime ParseDate(string input)
+    {
+        var today = DateTime.Today;
+
+        DateTime GetNextDayOccurrence(DayOfWeek dayOfWeek)
+        {
+            var day = DateTime.Today.AddDays(1);
+            while (day.DayOfWeek != dayOfWeek)
+            {
+                day = day.AddDays(1);
+            }
+            return day;
+        }
+
+        Dictionary<string, DateTime> days = new Dictionary<string, DateTime> {
       { "hoy", today },
       { "mañana", today.AddDays(1) },
       { "lunes", GetNextDayOccurrence(DayOfWeek.Monday) },
@@ -155,7 +173,27 @@ public class TelegramService : ITelegramService
             await SendReservationActions(context, club.Id, court.Id, hour, duration);
           }
         }
-      }
+
+        string pattern = @"\b(2[0-4]|1[0-9]|0?[0-9])\b";
+        Match match = Regex.Match(input, pattern);
+
+        if (!match.Success)
+        {
+            return DateTime.Now;
+        }
+        var hour = int.Parse(match.Value);
+        if (hour < 12 && input.ToLower().Contains("pm"))
+        {
+            hour += 12;
+        }
+
+        var minutes = 0;
+        if (input.Contains("30"))
+        {
+            minutes = 30;
+        }
+
+        return day.AddHours(hour).AddMinutes(minutes);
     }
 
     return true;
@@ -179,16 +217,16 @@ public class TelegramService : ITelegramService
     return true;
   }
 
-  public async Task<bool> HandleReadyCheckVote(Update update)
-  {
-    var count = update?.Poll?.Options.Single(o => o.Text == "Si").VoterCount;
-    this.logger.LogInformation("Handling poll");
-    if (!Common.pollChatIdDict.TryGetValue(update?.Poll?.Id!, out var chatId))
+    public async Task<bool> HandleReadyCheckVote(Update update)
     {
-      this.logger.LogWarning("Poll ID {Id} not found", update?.Poll?.Id);
-      return false;
-    }
-    var context = this.contextService.GetChatContext(update!);
+        var count = update?.Poll?.Options.Single(o => o.Text == "Si").VoterCount;
+        this.logger.LogInformation("Handling poll");
+        if (!Common.pollChatIdDict.TryGetValue(update?.Poll?.Id!, out var chatId))
+        {
+            this.logger.LogWarning("Poll ID {Id} not found", update?.Poll?.Id);
+            return false;
+        }
+        var context = this.contextService.GetChatContext(update!);
 
     if (count < this.paddleConfig.PlayerCount)
     {
@@ -242,7 +280,7 @@ public class TelegramService : ITelegramService
       this.logger.LogWarning("Chat ID null for update {Id} on ReadyCheckPoll step", update?.Id);
     }
 
-    if (matchDate == null)
+    private async Task DeleteMessages(UpdateContext context, BotMessageType type)
     {
       this.logger.LogWarning("Match Date returned null from Update Id {Id}", update?.Id);
     }
@@ -355,12 +393,11 @@ public class TelegramService : ITelegramService
     {
       return await StartReadyCheckPoll(context);
     }
-    else if (context.NextStep == "search")
+
+    public async Task<bool> HandleDatePick(Update update)
     {
       return await SendAvailableClubs(context);
     }
-    return false;
-  }
 
   public async Task<bool> HandlerPinReminderPick(Update update, string callbackData)
   {
