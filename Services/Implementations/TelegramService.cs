@@ -150,7 +150,7 @@ public class TelegramService : ITelegramService
         {
           if (court.Availability.Any(a => a.Duration.ToString() == duration && a.Start == hour))
           {
-            await SendReservationActions(context, club.Id, court.Id, hour, duration, club.Name, court.Name);
+            await SendReservationActions(context, club.Id, court.Id, hour, duration);
           }
         }
       }
@@ -331,19 +331,15 @@ public class TelegramService : ITelegramService
     var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
     var court = club?.Courts.FirstOrDefault(c => c.Id == courtId);
 
-    var buttons = court?.Availability.Select(
-        a =>
-        {
-          var value = $"{clubId}+{courtId}+{a.Start}+{a.Duration}";
-          return new[]
-                  {
-                    InlineKeyboardButton.WithCallbackData($"{a.Start} {a.Duration}min ${a.Price}", (Common.PICK_HOUR_COMMAND, value).EncodeCallback()),
-          };
-        }).ToArray();
+    var buttons = court?.Availability.GroupBy(a => a.Start).Select(
+        g => g.Select(a =>
+          InlineKeyboardButton.WithCallbackData($"{a.Start} {a.Duration}'", (Common.PICK_HOUR_COMMAND, $"{clubId}+{courtId}+{a.Start}+{a.Duration}").EncodeCallback())
+                      )
+        );
 
-    var message = @$"Reservar 📅*{context.SelectedDate}*
+    var message = @$"📅*{context.SelectedDate}*
 🏟️{club?.Name}
-🎾{court?.Name} ";
+🎾_{court?.Name}_ ";
     InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons!);
     var response = await this.botClient.SendMessage(
         context.ChatId!,
@@ -399,7 +395,6 @@ public class TelegramService : ITelegramService
   public async Task<bool> HandleHourPick(Update update)
   {
     var context = this.contextService.GetChatContext(update);
-    await this.DeleteMessages(context, BotMessageType.CourtMessage);
 
     (var _, var selection) = (update?.CallbackQuery?.Data!).DecodeCallback();
 
@@ -408,20 +403,24 @@ public class TelegramService : ITelegramService
     return await SendReservationActions(context, clubId, courtId, start, duration);
   }
 
-  public async Task<bool> SendReservationActions(UpdateContext context, string clubId, string courtId, string start, string duration, string clubName = "", string courtName = "")
+  public async Task<bool> SendReservationActions(UpdateContext context, string clubId, string courtId, string start, string duration)
   {
+    await this.DeleteMessages(context, BotMessageType.HourPicker);
     string callbackValue = $"{clubId}+{courtId}+{start}+{duration}";
 
     InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup();
     var url = this.paddleService.GetCheckoutUrl(clubId, context.SelectedDate, courtId, start, duration);
     inlineKeyboard.AddNewRow(InlineKeyboardButton.WithUrl("📅Reservar", url));
     inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData("📍Pinear mensaje", (Common.PIN_REMINDER_COMMAND, callbackValue).EncodeCallback()));
+    var club = this.paddleService.GetClubDetails(clubId);
+    var court = club.Courts.FirstOrDefault(c => c.Id == courtId);
 
     var response = await this.botClient.SendMessage(
         context.ChatId!,
-        text: @$"Reservar {start} {duration}min {context.SelectedDate} 
-{clubName}
-{courtName}
+        text: @$"Reservar
+📅{context.SelectedDate} 🕒{start} ⏱️{duration}min
+🏟️{club.Name}
+🎾{court.Name}
 ",
         messageThreadId: context.MessageThreadId,
         disableNotification: true,
@@ -461,15 +460,20 @@ public class TelegramService : ITelegramService
     var court = club?.Courts.FirstOrDefault(c => c.Id == courtId);
 
     var message = @$"Detalles del partido:
-🏟️ {club?.Name} - 📍 {club?.Location.Address} - {context.SelectedDate}
-{court?.Name} - {start} {duration}min
+📅 *{context.SelectedDate}*
+📍 {club?.Location.Address}
+🏟️ {club?.Name}
+🎾 {court?.Name}
+🕒{start}
+⏱️{duration}min
         ";
 
     var response = await this.botClient.SendMessage(
         context.ChatId!,
-        message,
+        message.EscapeCharsForMarkdown(),
         messageThreadId: context.MessageThreadId,
-        disableNotification: true);
+        disableNotification: true,
+        parseMode: Telegram.Bot.Types.Enums.ParseMode.MarkdownV2);
     await this.botClient.PinChatMessage(context.ChatId!, response.MessageId, disableNotification: true);
     return true;
   }
