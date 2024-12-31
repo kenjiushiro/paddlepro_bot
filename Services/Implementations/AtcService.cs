@@ -70,24 +70,28 @@ public class AtcService : IPaddleService
     );
 
     var availability = this.mapper.Map<Availability>(deserialized);
-    this.cache.Set("availability", availability);
+    if (!this.cache.TryGetValue("clubs", out var _))
+    {
+      this.cache.Set($"clubs", availability.Clubs);
+    }
+    this.cache.Set($"availability{date}", availability);
     return availability;
   }
 
   public Club GetClubDetails(string id)
   {
-    var availability = this.cache.Get<Availability>("availability");
-    return availability?.Clubs.FirstOrDefault(c => c.Id == id)!;
+    var clubs = this.cache.Get<Club[]>("clubs");
+    return clubs.FirstOrDefault(c => c.Id == id)!;
   }
 
   public async Task<Availability> GetAvailability(string date)
   {
-    if (!this.cache.TryGetValue<Availability>("availability", out Availability? availability))
+    if (!this.cache.TryGetValue<Availability>($"availability{date}", out Availability? availability))
     {
-      (int hours, int minutes, int seconds) = (1, 0, 0);
+      (int hours, int minutes, int seconds) = (0, 5, 0);
       TimeSpan expiration = new TimeSpan(hours, minutes, seconds);
       availability = this.cache.Set(
-          "availability",
+          $"availability{date}",
           await this.DoGetAvailability(date),
           new MemoryCacheEntryOptions
           {

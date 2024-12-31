@@ -14,6 +14,13 @@ public class Club
   public string PhoneNumber { get; set; } = "";
   public string Notes { get; set; } = "";
   public Court[] Courts { get; set; } = new Court[0];
+  public bool IsAvailable
+  {
+    get
+    {
+      return this.Courts.Any(c => c.IsAvailable);
+    }
+  }
 }
 
 public class CourtAvailability
@@ -31,6 +38,14 @@ public class Court
   public string Name { get; set; } = "";
   public string SurfaceType { get; set; } = "";
   public bool IsBeelup { get; set; }
+
+  public bool IsAvailable
+  {
+    get
+    {
+      return this.Availability.Any();
+    }
+  }
 
   public CourtAvailability[] Availability { get; set; }
 }

@@ -5,6 +5,7 @@ public enum BotMessageType
   DayPicker,
   ReadyCheckPoll,
   CountMessage,
+  ClubMessage,
   CourtMessage,
   HourPicker,
 }
