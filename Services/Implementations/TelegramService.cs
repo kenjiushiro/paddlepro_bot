@@ -1,5 +1,4 @@
 using Telegram.Bot;
-using Telegram.Bot.Types.ReplyMarkups;
 using paddlepro.API.Models;
 using paddlepro.API.Helpers;
 using paddlepro.API.Services.Interfaces;
@@ -16,6 +15,7 @@ namespace paddlepro.API.Services.Implementations;
 public class TelegramService : ITelegramService
 {
     private readonly ITelegramBotClient botClient;
+    private readonly IMessageFormatterService messageFormatter;
     private readonly ILogger<TelegramService> logger;
     private readonly AtcServiceConfiguration paddleConfig;
     private readonly TelegramConfiguration telegramConfig;
@@ -29,6 +29,7 @@ public class TelegramService : ITelegramService
 
     public TelegramService(
         ITelegramBotClient botClient,
+        IMessageFormatterService messageFormatter,
         ILogger<TelegramService> logger,
         IOptions<AtcServiceConfiguration> paddleConfig,
         IOptions<TelegramConfiguration> telegramConfig,
@@ -50,6 +51,7 @@ public class TelegramService : ITelegramService
         this.azureService = azureService;
         this.cache = cache;
         this.mapper = mapper;
+        this.messageFormatter = messageFormatter;
     }
 
     public static DateTime ParseDate(string input)
@@ -164,17 +166,9 @@ public class TelegramService : ITelegramService
         var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
         var clubs = availability.Clubs.Where(x => this.paddleConfig.ClubIds.ToList().Contains(x.Id) && x.IsAvailable).ToArray();
         context.ClearMessages(BotMessageType.DayPicker);
-        var message = clubs.Select(club => GetClubMessage(club, context.SelectedDate)).Where(m => !string.IsNullOrEmpty(m)).Join("\n\n").EscapeCharsForMarkdown();
 
-        var buttons = clubs.Select(c =>
-        {
-            return new[]
-              {
-                InlineKeyboardButton.WithCallbackData($"{c.Name}", (Common.PICK_CLUB_COMMAND, c.Id).EncodeCallback()),
-                };
-        });
+        var (message, inlineKeyboard) = this.messageFormatter.FormatClubsAvailabilityMessage(clubs, context.SelectedDate);
 
-        InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons);
         var response = await this.botClient.SendMessage(
             context.ChatId!,
             message,
@@ -211,36 +205,6 @@ public class TelegramService : ITelegramService
         }
     }
 
-    private string GetAvailabilityMessage(Models.Application.Court court)
-    {
-        return court.Availability.GroupBy(a => a.Start).Select(a => @$"
->{a.Key} - {a.Select(b => b.Duration + "min").Join(" - ")}").Join("");
-    }
-
-    private string GetCourtMessage(Models.Application.Court court)
-    {
-        var roofed = court.IsRoofed ? "Techada" : "No techada";
-
-        return @$"🎾*{court.Name}*
-**>{roofed} {GetAvailabilityMessage(court)}||
-";
-    }
-
-    private string GetClubMessage(Club club, string date)
-    {
-        var hoursAvailable = club
-          .Courts
-          .SelectMany(c => c.Availability)
-          .GroupBy(a => a.Start)
-          .Select(a => $">{a.Key} {a.Select(b => b.Duration.ToString() + "min").Distinct().Join(" - ")}")
-          .Join("\n>");
-        return @$"
-*🏟️ {club.Name}
-📍 {club.Location.Address}*
-**>
-{hoursAvailable} ||";
-    }
-
     private async Task DeleteMessages(UpdateContext context, BotMessageType type)
     {
         var messageToDelete = context.GetMessages(type);
@@ -251,7 +215,7 @@ public class TelegramService : ITelegramService
         }
     }
 
-    public async Task<bool> SendAvailableDates(Update update, string nextStep)
+    public async Task<bool> SendDatePicker(Update update, string nextStep)
     {
         var context = this.contextService.GetChatContext(update);
         context.NextStep = nextStep;
@@ -260,27 +224,10 @@ public class TelegramService : ITelegramService
 
         await this.DeleteMessages(context, BotMessageType.DayPicker);
 
-        var inlineKeyboard = new InlineKeyboardMarkup();
+        (var message, var inlineKeyboard) = this.messageFormatter.FormatDayPicker(forecast, this.paddleConfig.DaysInAdvance);
 
-        DateTime startDate = DateTime.UtcNow;
-        for (var i = 0; i < this.paddleConfig.DaysInAdvance; i++)
-        {
-            var date = startDate.AddDays(i);
-            var buttonDisplay = date.ToString("dddd dd-MM", new System.Globalization.CultureInfo("es-ES"));
-            var buttonValue = date.ToString("yyyy-MM-dd");
-            var dayForecast = forecast.SingleOrDefault(f => f.Day == buttonValue);
-
-            var rainEmoji = "";
-
-            buttonDisplay = $"{buttonDisplay} {dayForecast?.Emoji} {dayForecast?.MinTemp}°C-{dayForecast?.MaxTemp}°C {rainEmoji} {dayForecast?.ChanceOfRain}%";
-            inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(buttonDisplay, (Common.PICK_DATE_COMMAND, buttonValue).EncodeCallback()));
-        }
-        this.logger.LogInformation("ChatId: {ChatId}", context.ChatId);
-        this.logger.LogInformation("ThreadId: {ThreadId}", context.MessageThreadId);
-        this.logger.LogInformation("Context: {Context}", context);
-
-        var message = await this.botClient.SendMessage(context.ChatId!, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);
-        context.AddMessage(message.MessageId, BotMessageType.DayPicker);
+        var response = await this.botClient.SendMessage(context.ChatId!, "Elegi dia", messageThreadId: context.MessageThreadId, replyMarkup: inlineKeyboard, disableNotification: true);
+        context.AddMessage(response.MessageId, BotMessageType.DayPicker);
         return true;
     }
 
@@ -333,19 +280,11 @@ public class TelegramService : ITelegramService
         var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
         var court = club?.Courts.FirstOrDefault(c => c.Id == courtId);
 
-        var buttons = court?.Availability.GroupBy(a => a.Start).Select(
-            g => g.Select(a =>
-              InlineKeyboardButton.WithCallbackData($"{a.Start} {a.Duration}'", (Common.PICK_HOUR_COMMAND, $"{clubId}+{courtId}+{a.Start}+{a.Duration}").EncodeCallback())
-                          )
-            );
+        (var message, var inlineKeyboard) = this.messageFormatter.FormatMatchPickerMessage(club!, court!, context.SelectedDate);
 
-        var message = @$"📅*{context.SelectedDate}*
-🏟️{club?.Name}
-🎾_{court?.Name}_ ";
-        InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons!);
         var response = await this.botClient.SendMessage(
             context.ChatId!,
-            message.EscapeCharsForMarkdown(),
+            message,
             messageThreadId: context.MessageThreadId,
             disableNotification: true,
             replyMarkup: inlineKeyboard,
@@ -364,27 +303,12 @@ public class TelegramService : ITelegramService
         (var _, var clubId) = (update?.CallbackQuery?.Data!).DecodeCallback();
         var availability = this.mapper.Map<Availability>(await this.paddleService.GetAvailability(context.SelectedDate));
         var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
-        var courts = club?.Courts.Where(c => c.IsAvailable);
 
-        var buttons = courts?.Select(
-            court =>
-            {
-                var value = $"{clubId}:{court.Id}";
-                return new[]
-                    {
-                    InlineKeyboardButton.WithCallbackData($"{court.Name}", (Common.PICK_COURT_COMMAND, value).EncodeCallback()),
-              };
-            }).ToArray();
+        (var message, var inlineKeyboard) = this.messageFormatter.FormatCourtsAvailabilityMessage(club!, context.SelectedDate);
 
-
-        var message = @$"📅 {context.SelectedDate}
-🏟️{club?.Name}
-{courts?.Select(c => GetCourtMessage(c)).Join("\n")}";
-
-        InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons!);
         var response = await this.botClient.SendMessage(
             context.ChatId!,
-            message.EscapeCharsForMarkdown(),
+            message,
             messageThreadId: context.MessageThreadId,
             disableNotification: true,
             replyMarkup: inlineKeyboard,
@@ -397,33 +321,25 @@ public class TelegramService : ITelegramService
     public async Task<bool> HandleHourPick(Update update)
     {
         var context = this.contextService.GetChatContext(update);
-
         (var _, var selection) = (update?.CallbackQuery?.Data!).DecodeCallback();
-
         (var clubId, var courtId, var start, var duration) = selection.SplitBy4("+");
-
         return await SendReservationActions(context, clubId, courtId, start, duration);
     }
 
     public async Task<bool> SendReservationActions(UpdateContext context, string clubId, string courtId, string start, string duration)
     {
         await this.DeleteMessages(context, BotMessageType.HourPicker);
-        string callbackValue = $"{clubId}+{courtId}+{start}+{duration}";
 
-        InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup();
-        var url = this.paddleService.GetCheckoutUrl(clubId, context.SelectedDate, courtId, start, duration);
-        inlineKeyboard.AddNewRow(InlineKeyboardButton.WithUrl("📅Reservar", url));
-        inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData("📍Pinear mensaje", (Common.PIN_REMINDER_COMMAND, callbackValue).EncodeCallback()));
         var club = this.paddleService.GetClubDetails(clubId);
         var court = club.Courts.FirstOrDefault(c => c.Id == courtId);
 
+        var url = this.paddleService.GetCheckoutUrl(club.Id, context.SelectedDate, court?.Id!, start, duration);
+
+        var (message, inlineKeyboard) = this.messageFormatter.FormatSendReservationActions(club, court!, context.SelectedDate, start, duration, url);
+
         var response = await this.botClient.SendMessage(
             context.ChatId!,
-            text: @$"Reservar
-📅{context.SelectedDate} 🕒{start} ⏱️{duration}min
-🏟️{club.Name}
-🎾{court.Name}
-",
+            text: message,
             messageThreadId: context.MessageThreadId,
             disableNotification: true,
             replyMarkup: inlineKeyboard
@@ -461,18 +377,11 @@ public class TelegramService : ITelegramService
         var club = availability.Clubs.FirstOrDefault(c => c.Id == clubId);
         var court = club?.Courts.FirstOrDefault(c => c.Id == courtId);
 
-        var message = @$"Detalles del partido:
-📅 *{context.SelectedDate}*
-📍 {club?.Location.Address}
-🏟️ {club?.Name}
-🎾 {court?.Name}
-🕒{start}
-⏱️{duration}min
-        ";
+        var message = this.messageFormatter.FormatPinnedMessageReminder(club!, court!, context.SelectedDate, start, duration);
 
         var response = await this.botClient.SendMessage(
             context.ChatId!,
-            message.EscapeCharsForMarkdown(),
+            message,
             messageThreadId: context.MessageThreadId,
             disableNotification: true,
             parseMode: Telegram.Bot.Types.Enums.ParseMode.MarkdownV2
