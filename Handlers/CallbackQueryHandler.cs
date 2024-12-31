@@ -21,15 +21,15 @@ public class CallbackQueryHandler : IUpdateHandler
 
   public async Task<bool> Handle(Update update)
   {
-    Dictionary<string, Func<Update, Task<bool>>> commands = new Dictionary<string, Func<Update, Task<bool>>>
+    var commands = new Dictionary<string, Func<Update, string, Task<bool>>>
         {
-          { Common.PICK_CLUB_COMMAND, this.telegramService.HandleClubPick },
           { Common.PICK_DATE_COMMAND, this.telegramService.HandleDatePick },
+          { Common.PICK_CLUB_COMMAND, this.telegramService.HandleClubPick },
           { Common.PICK_COURT_COMMAND, this.telegramService.HandleCourtPick },
           { Common.PICK_HOUR_COMMAND, this.telegramService.HandleHourPick },
           { Common.PIN_REMINDER_COMMAND, this.telegramService.SendPinnedMatchReminderMessage },
         };
-    (var action, var _) = (update?.CallbackQuery?.Data!).DecodeCallback();
+    (var action, string callbackData) = (update?.CallbackQuery?.Data!).DecodeCallback();
 
     if (!commands.TryGetValue(action, out var actionHandler))
     {
@@ -38,6 +38,6 @@ public class CallbackQueryHandler : IUpdateHandler
     }
 
     this.logger.LogInformation("Callback received: {Action}", action);
-    return await actionHandler(update!);
+    return await actionHandler(update!, callbackData);
   }
 }

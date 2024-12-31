@@ -23,7 +23,7 @@ public class MessageFormatterService : IMessageFormatterService
         });
         InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(buttons);
 
-        var message = clubs.Select(club => GetClubMessage(club)).Where(m => !string.IsNullOrEmpty(m)).Join("\n\n").MdEscapeChars();
+        var message = clubs.Select(club => GetClubMessage(club)).Where(m => !string.IsNullOrEmpty(m)).Join("\n\n");
         return (message.MdEscapeChars(), inlineKeyboard);
     }
 

@@ -8,10 +8,10 @@ public interface ITelegramService
     Task<bool> SendAvailableClubs(UpdateContext context);
     Task<bool> HandleReadyCheckVote(Update update);
     Task<bool> SendDatePicker(Update update, string nextStep);
-    Task<bool> SendPinnedMatchReminderMessage(Update update);
-    Task<bool> HandleDatePick(Update update);
-    Task<bool> HandleCourtPick(Update update);
-    Task<bool> HandleClubPick(Update update);
-    Task<bool> HandleHourPick(Update update);
+    Task<bool> SendPinnedMatchReminderMessage(Update update, string callbackDate);
+    Task<bool> HandleDatePick(Update update, string callbackData);
+    Task<bool> HandleCourtPick(Update update, string callbackData);
+    Task<bool> HandleClubPick(Update update, string callbackData);
+    Task<bool> HandleHourPick(Update update, string callbackData);
     Task<bool> BookCourt(Update update);
 }
