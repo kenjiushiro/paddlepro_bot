@@ -27,8 +27,9 @@ public class WebhookController : ControllerBase
     {
       return await this.updateDispatcher.Dispatch(update);
     }
-    catch
+    catch (Exception ex)
     {
+      this.logger.LogError("Exception: {Ex}", ex);
       return false;
     }
   }
