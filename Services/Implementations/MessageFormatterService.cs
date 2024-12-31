@@ -79,8 +79,9 @@ public class MessageFormatterService : IMessageFormatterService
       var dayForecast = forecast.SingleOrDefault(f => f.Day == buttonValue);
 
       var rainEmoji = "";
+      var forecastInfo = dayForecast != null ? $"{dayForecast?.Emoji} {dayForecast?.MinTemp}°C-{dayForecast?.MaxTemp}°C {rainEmoji} {dayForecast?.ChanceOfRain}%" : "";
 
-      buttonDisplay = $"{buttonDisplay} {dayForecast?.Emoji} {dayForecast?.MinTemp}°C-{dayForecast?.MaxTemp}°C {rainEmoji} {dayForecast?.ChanceOfRain}%";
+      buttonDisplay = $"{buttonDisplay} {forecastInfo}";
       inlineKeyboard.AddNewRow(InlineKeyboardButton.WithCallbackData(buttonDisplay, (Common.PICK_DATE_COMMAND, buttonValue).EncodeCallback()));
     }
 
